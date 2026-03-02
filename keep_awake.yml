@@ -1,0 +1,14 @@
+name: Keep SarSa AI Awake
+
+on:
+  schedule:
+    # Her 30 dakikada bir çalışır, siteyi hep taze tutar.
+    - cron: '*/30 * * * *'
+  workflow_dispatch: # İstediğinde elle çalıştırma butonu ekler.
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wake up call
+        run: curl -I https://sarsa-ai-estate-intelligence.streamlit.app/
