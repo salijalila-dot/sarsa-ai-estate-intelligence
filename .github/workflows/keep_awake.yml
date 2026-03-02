@@ -11,4 +11,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Wake up call
-        run: curl -I https://sarsa-ai-estate-intelligence.streamlit.app/
+        run: curl -I https://sarsa-ai-estateintelligence.streamlit.app/
