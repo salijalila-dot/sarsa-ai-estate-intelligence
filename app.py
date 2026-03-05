@@ -6,7 +6,7 @@ import os
 # --- AI YAPILANDIRMASI ---
 GOOGLE_API_KEY = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=GOOGLE_API_KEY)
-MODEL_NAME = 'gemini-1.5-flash'
+MODEL_NAME = 'gemini-2.5-flash'
 model = genai.GenerativeModel(MODEL_NAME)
 
 # --- SAYFA AYARLARI ---
@@ -195,3 +195,4 @@ if st.session_state.is_generated:
     with e_col5:
         all_combined = f"{st.session_state.listing}\n\n{st.session_state.social}\n\n{st.session_state.video}\n\n{st.session_state.tech}"
         st.download_button("📦 DOWNLOAD ALL", all_combined, "sarsa_full_package.txt", type="primary")
+
