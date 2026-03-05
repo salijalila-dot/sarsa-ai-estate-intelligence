@@ -29,7 +29,10 @@ ui_languages = {
         "ph_prop": "E.g., 3+1 Apartment, Luxury Villa...", "ph_price": "E.g., $500,000 or £2,000/mo...", "ph_loc": "E.g., Manhattan, NY or London, UK...",
         "custom_inst": "📝 Special Notes", "custom_inst_ph": "E.g., High ceilings, near metro...", "btn": "🚀 GENERATE COMPLETE MARKETING ASSETS", "upload_label": "📸 Drop Property Photos Here",
         "result": "💎 Executive Preview", "loading": "Crafting your premium marketing ecosystem...", "empty": "Awaiting visuals to start professional analysis.", "download": "📥 Export TXT", "save_btn": "💾 Save Changes", "saved_msg": "✅ Saved!", "error": "Error:",
-        "tab_main": "📝 Prime Listing", "tab_social": "📱 Social Media Kit", "tab_video": "🎬 Video Scripts", "tab_tech": "⚙️ Technical Specs", "label_main": "Sales Copy", "label_social": "Social Media Content", "label_video": "Video Script", "label_tech": "Technical Specifications"
+        "tab_main": "📝 Prime Listing", "tab_social": "📱 Social Media Kit", "tab_video": "🎬 Video Scripts", "tab_tech": "⚙️ Technical Specs", "label_main": "Sales Copy", "label_social": "Social Media Content", "label_video": "Video Script", "label_tech": "Technical Specifications",
+        "unsaved_warning": "⚠️ You have unsaved changes! Click 'Save Changes' before generating new content.",
+        "unsaved_indicator": "📝 Unsaved Changes",
+        "saved_indicator": "✅ All Changes Saved"
     }, 
     "Türkçe": { 
         "title": "SarSa AI | Gayrimenkul Analiz ve Pazarlama Motoru", 
@@ -40,7 +43,10 @@ ui_languages = {
         "ph_prop": "Örn: 3+1 Daire, Müstakil Villa...", "ph_price": "Örn: 5.000.000 TL veya $2.500/ay...", "ph_loc": "Örn: Beşiktaş, İstanbul...",
         "custom_inst": "📝 Özel Notlar", "custom_inst_ph": "Örn: Yüksek tavanlar, metroya yakın...", "btn": "🚀 TÜM PAZARLAMA VARLIKLARINI OLUŞTUR", "upload_label": "📸 Fotoğrafları Buraya Bırakın",
         "result": "💎 Yönetici Önizlemesi", "loading": "Premium pazarlama ekosisteminiz hazırlanıyor...", "empty": "Profesyonel analiz için görsel bekleniyor.", "download": "📥 TXT Olarak İndir", "save_btn": "💾 Kaydet", "saved_msg": "✅ Kaydedildi!", "error": "Hata:",
-        "tab_main": "📝 Ana İlan", "tab_social": "📱 Sosyal Medya Kiti", "tab_video": "🎬 Video Senaryoları", "tab_tech": "⚙️ Teknik Özellikler", "label_main": "Satış Metni", "label_social": "Sosyal Medya", "label_video": "Video Script", "label_tech": "Teknik Detaylar"
+        "tab_main": "📝 Ana İlan", "tab_social": "📱 Sosyal Medya Kiti", "tab_video": "🎬 Video Senaryoları", "tab_tech": "⚙️ Teknik Özellikler", "label_main": "Satış Metni", "label_social": "Sosyal Medya", "label_video": "Video Script", "label_tech": "Teknik Detaylar",
+        "unsaved_warning": "⚠️ Kaydedilmemiş değişiklikleriniz var! Yeni içerik oluşturmadan önce 'Kaydet' butonuna tıklayın.",
+        "unsaved_indicator": "📝 Kaydedilmemiş Değişiklikler",
+        "saved_indicator": "✅ Tüm Değişiklikler Kaydedildi"
     },
     "Español": { 
         "title": "SarSa AI | Motor de Marketing y Análisis Inmobiliario", 
@@ -51,7 +57,10 @@ ui_languages = {
         "ph_prop": "Ej: Apartamento 3+1, Villa de Lujo...", "ph_price": "Ej: $500.000 o €1.500/mes...", "ph_loc": "Ej: Madrid, España...",
         "custom_inst": "📝 Notas Especiales", "custom_inst_ph": "Ej: Techos altos, cerca del metro...", "btn": "🚀 GENERAR ACTIVOS DE MARKETING COMPLETOS", "upload_label": "📸 Subir Fotos Aquí",
         "result": "💎 Vista Previa Ejecutiva", "loading": "Creando su ecosistema de marketing...", "empty": "Esperando imágenes para análisis profesional.", "download": "📥 Exportar TXT", "save_btn": "💾 Guardar Cambios", "saved_msg": "✅ ¡Guardado!", "error": "Error:",
-        "tab_main": "📝 Anuncio Premium", "tab_social": "📱 Kit de Redes", "tab_video": "🎬 Guiones de Video", "tab_tech": "⚙️ Especificaciones", "label_main": "Texto de Ventas", "label_social": "Contenido Social", "label_video": "Guion de Video", "label_tech": "Ficha Técnica"
+        "tab_main": "📝 Anuncio Premium", "tab_social": "📱 Kit de Redes", "tab_video": "🎬 Guiones de Video", "tab_tech": "⚙️ Especificaciones", "label_main": "Texto de Ventas", "label_social": "Contenido Social", "label_video": "Guion de Video", "label_tech": "Ficha Técnica",
+        "unsaved_warning": "⚠️ Tienes cambios sin guardar. Haz clic en 'Guardar Cambios' antes de generar nuevo contenido.",
+        "unsaved_indicator": "📝 Cambios Sin Guardar",
+        "saved_indicator": "✅ Todos los Cambios Guardados"
     },
     "Deutsch": { 
         "title": "SarSa AI | Immobilienanalyse & Marketing-Plattform", 
@@ -62,7 +71,10 @@ ui_languages = {
         "ph_prop": "Z.B. 3-Zimmer-Wohnung, Luxusvilla...", "ph_price": "Z.B. 500.000€ oder 2.000€/Monat...", "ph_loc": "Z.B. Berlin, Deutschland...",
         "custom_inst": "📝 Notizen", "custom_inst_ph": "Z.B. Hohe Decken, U-Bahn-Nähe...", "btn": "🚀 KOMPLETTE MARKETING-ASSETS ERSTELLEN", "upload_label": "📸 Fotos hier hochladen",
         "result": "💎 Executive-Vorschau", "loading": "Ihr Marketing-Ökosystem wird erstellt...", "empty": "Warte auf Bilder für die Analyse.", "download": "📥 TXT Exportieren", "save_btn": "💾 Speichern", "saved_msg": "✅ Gespeichert!", "error": "Fehler:",
-        "tab_main": "📝 Premium-Exposé", "tab_social": "📱 Social Media Kit", "tab_video": "🎬 Videoskripte", "tab_tech": "⚙️ Tech-Details", "label_main": "Verkaufstext", "label_social": "Social Media Content", "label_video": "Video-Skript", "label_tech": "Technische Daten"
+        "tab_main": "📝 Premium-Exposé", "tab_social": "📱 Social Media Kit", "tab_video": "🎬 Videoskripte", "tab_tech": "⚙️ Tech-Details", "label_main": "Verkaufstext", "label_social": "Social Media Content", "label_video": "Video-Skript", "label_tech": "Technische Daten",
+        "unsaved_warning": "⚠️ Ungespeicherte Änderungen! Klicken Sie auf 'Speichern', bevor Sie neue Inhalte generieren.",
+        "unsaved_indicator": "📝 Ungespeicherte Änderungen",
+        "saved_indicator": "✅ Alle Änderungen Gespeichert"
     },
     "Français": { 
         "title": "SarSa AI | Moteur d'Analyse et de Marketing Immobilier", 
@@ -73,7 +85,10 @@ ui_languages = {
         "ph_prop": "Ex: Appartement T4, Villa de Luxe...", "ph_price": "Ex: 500.000€ ou 1.500€/mois...", "ph_loc": "Ex: Paris, France...",
         "custom_inst": "📝 Notes Spéciales", "custom_inst_ph": "Ex: Plafonds hauts, proche métro...", "btn": "🚀 GÉNÉRER LES ACTIFS MARKETING COMPLETS", "upload_label": "📸 Déposer les Photos Ici",
         "result": "💎 Aperçu Exécutif", "loading": "Préparation de votre écosystème marketing...", "empty": "En attente d'images pour analyse.", "download": "📥 Exporter TXT", "save_btn": "💾 Enregistrer", "saved_msg": "✅ Enregistré !", "error": "Erreur :",
-        "tab_main": "📝 Annonce Premium", "tab_social": "📱 Kit Réseaux Sociaux", "tab_video": "🎬 Scripts Vidéo", "tab_tech": "⚙️ Spécifications", "label_main": "Texte de Vente", "label_social": "Contenu Social", "label_video": "Script Vidéo", "label_tech": "Détails Techniques"
+        "tab_main": "📝 Annonce Premium", "tab_social": "📱 Kit Réseaux Sociaux", "tab_video": "🎬 Scripts Vidéo", "tab_tech": "⚙️ Spécifications", "label_main": "Texte de Vente", "label_social": "Contenu Social", "label_video": "Script Vidéo", "label_tech": "Détails Techniques",
+        "unsaved_warning": "⚠️ Modifications non enregistrées ! Cliquez sur 'Enregistrer' avant de générer du nouveau contenu.",
+        "unsaved_indicator": "📝 Modifications Non Enregistrées",
+        "saved_indicator": "✅ Toutes les Modifications Enregistrées"
     },
     "Português": { 
         "title": "SarSa AI | Motor de Marketing e Análise Imobiliária", 
@@ -84,7 +99,10 @@ ui_languages = {
         "ph_prop": "Ex: Apartamento T3, Moradia de Luxo...", "ph_price": "Ex: 500.000€ ou 1.500€/mês...", "ph_loc": "Ex: Lisboa, Portugal...",
         "custom_inst": "📝 Notas Especiais", "custom_inst_ph": "Ex: Tetos altos, perto do metrô...", "btn": "🚀 GERAR ATIVOS DE MARKETING COMPLETOS", "upload_label": "📸 Enviar Fotos Aqui",
         "result": "💎 Pré-visualização Executiva", "loading": "Preparando seu ecossistema de marketing...", "empty": "Aguardando imagens para análise.", "download": "📥 Exportar TXT", "save_btn": "💾 Salvar Alterações", "saved_msg": "✅ Salvo!", "error": "Erro:",
-        "tab_main": "📝 Anúncio Premium", "tab_social": "📱 Kit Redes Sociais", "tab_video": "🎬 Roteiros de Vídeo", "tab_tech": "⚙️ Detalhes", "label_main": "Texto de Vendas", "label_social": "Conteúdo Social", "label_video": "Script de Vídeo", "label_tech": "Especificações Técnicas"
+        "tab_main": "📝 Anúncio Premium", "tab_social": "📱 Kit Redes Sociais", "tab_video": "🎬 Roteiros de Vídeo", "tab_tech": "⚙️ Detalhes", "label_main": "Texto de Vendas", "label_social": "Conteúdo Social", "label_video": "Script de Vídeo", "label_tech": "Especificações Técnicas",
+        "unsaved_warning": "⚠️ Alterações não salvas! Clique em 'Salvar Alterações' antes de gerar novo conteúdo.",
+        "unsaved_indicator": "📝 Alterações Não Salvas",
+        "saved_indicator": "✅ Todas as Alterações Salvas"
     },
     "日本語": { 
         "title": "SarSa AI | 不動産分析＆マーケティングエンジン", 
@@ -95,7 +113,10 @@ ui_languages = {
         "ph_prop": "例：3LDKマンション、高級別荘...", "ph_price": "例：5000万円、月20万円...", "ph_loc": "例：東京都港区...",
         "custom_inst": "📝 特記事項", "custom_inst_ph": "例：高い天井、駅近...", "btn": "🚀 完全なマーケティング資産を生成", "upload_label": "📸 ここに写真をアップロード",
         "result": "💎 エグゼクティブプレビュー", "loading": "マーケティングエコシステムを構築中...", "empty": "分析用の画像を待機中。", "download": "📥 TXT出力", "save_btn": "💾 変更を保存", "saved_msg": "✅ 保存完了！", "error": "エラー:",
-        "tab_main": "📝 プレミアム広告", "tab_social": "📱 SNSキット", "tab_video": "🎬 動画台本", "tab_tech": "⚙️ 技術仕様", "label_main": "セールスコピー", "label_social": "SNSコンテンツ", "label_video": "動画台本", "label_tech": "技術仕様"
+        "tab_main": "📝 プレミアム広告", "tab_social": "📱 SNSキット", "tab_video": "🎬 動画台本", "tab_tech": "⚙️ 技術仕様", "label_main": "セールスコピー", "label_social": "SNSコンテンツ", "label_video": "動画台本", "label_tech": "技術仕様",
+        "unsaved_warning": "⚠️ 保存されていない変更があります！新しいコンテンツを生成する前に「変更を保存」をクリックしてください。",
+        "unsaved_indicator": "📝 未保存の変更",
+        "saved_indicator": "✅ すべての変更を保存済み"
     },
     "中文 (简体)": { 
         "title": "SarSa AI | 房地产分析与营销引擎", 
@@ -106,7 +127,10 @@ ui_languages = {
         "ph_prop": "例如：3居室公寓，豪华别墅...", "ph_price": "例如：$500,000 或 $2,000/月...", "ph_loc": "例如：上海市浦东新区...",
         "custom_inst": "📝 特别备注", "custom_inst_ph": "例如：挑高天花板，靠近地铁...", "btn": "🚀 生成完整营销资产", "upload_label": "📸 在此处上传照片",
         "result": "💎 高管预览", "loading": "正在打造您的营销生态系统...", "empty": "等待图像进行分析。", "download": "📥 导出 TXT", "save_btn": "💾 保存更改", "saved_msg": "✅ 已保存！", "error": "错误:",
-        "tab_main": "📝 优质房源", "tab_social": "📱 社交媒体包", "tab_video": "🎬 视频脚本", "tab_tech": "⚙️ 技术细节", "label_main": "销售文案", "label_social": "社媒内容", "label_video": "视频脚本", "label_tech": "技术规格"
+        "tab_main": "📝 优质房源", "tab_social": "📱 社交媒体包", "tab_video": "🎬 视频脚本", "tab_tech": "⚙️ 技术细节", "label_main": "销售文案", "label_social": "社媒内容", "label_video": "视频脚本", "label_tech": "技术规格",
+        "unsaved_warning": "⚠️ 有未保存的更改！在生成新内容之前，请点击「保存更改」。",
+        "unsaved_indicator": "📝 未保存的更改",
+        "saved_indicator": "✅ 所有更改已保存"
     },
     "العربية": { 
         "title": "SarSa AI | محرك تحليل وتسويق العقارات", 
@@ -117,13 +141,16 @@ ui_languages = {
         "ph_prop": "مثال: شقة 3+1، فيلا فاخرة...", "ph_price": "مثال: $500,000 أو $2,000 شهرياً...", "ph_loc": "مثال: دبي، الإمارات...",
         "custom_inst": "📝 ملاحظات خاصة", "custom_inst_ph": "مثال: أسقف عالية، بالقرب من المترو...", "btn": "🚀 إنشاء أصول تسويقية متكاملة", "upload_label": "📸 ضع الصور هنا",
         "result": "💎 معاينة تنفيذية", "loading": "جاري تجهيز منظومتك التسويقية الفاخرة...", "empty": "في انتظار الصور لبدء التحليل المهني.", "download": "📥 تصدير TXT", "save_btn": "💾 حفظ التغييرات", "saved_msg": "✅ تم الحفظ!", "error": "خطأ:",
-        "tab_main": "📝 إعلان مميز", "tab_social": "📱 باقة التواصل", "tab_video": "🎬 سيناريوهات الفيديو", "tab_tech": "⚙️ تفاصيل", "label_main": "نص المبيعات", "label_social": "محتوى التواصل", "label_video": "سيناريو الفيديو", "label_tech": "المواصفات الفنية"
+        "tab_main": "📝 إعلان مميز", "tab_social": "📱 باقة التواصل", "tab_video": "🎬 سيناريوهات الفيديو", "tab_tech": "⚙️ تفاصيل", "label_main": "نص المبيعات", "label_social": "محتوى التواصل", "label_video": "سيناريو الفيديو", "label_tech": "المواصفات الفنية",
+        "unsaved_warning": "⚠️ لديك تغييرات غير محفوظة! انقر على 'حفظ التغييرات' قبل إنشاء محتوى جديد.",
+        "unsaved_indicator": "📝 تغييرات غير محفوظة",
+        "saved_indicator": "✅ تم حفظ جميع التغييرات"
     }
 } 
 
 # --- SESSION STATE (TEMİZ BAŞLANGIÇ AYARLARI) --- 
 # Başlangıç değerleri boş bırakıldı ki placeholder'lar görünsün.
-for key, val in [("uretilen_ilan", ""), ("prop_type", ""), ("price", ""), ("location", ""), ("tone", ""), ("custom_inst", ""), ("target_lang_input", "English")]:
+for key, val in [("uretilen_ilan", ""), ("prop_type", ""), ("price", ""), ("location", ""), ("tone", ""), ("custom_inst", ""), ("target_lang_input", "English"), ("has_unsaved_changes", False)]:
     if key not in st.session_state: st.session_state[key] = val
 
 # --- CSS (STİL KORUNDU) --- 
@@ -152,6 +179,28 @@ st.markdown("""
         .stButton>button:hover { background: #1e293b; box-shadow: 0 4px 12px rgba(0,0,0,0.1); } 
          
         .stTabs [aria-selected="true"] { background-color: #0f172a !important; color: white !important; border-radius: 8px 8px 0 0; }
+        
+        /* Unsaved changes indicator styling */
+        .unsaved-badge {
+            background-color: #f59e0b;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            display: inline-block;
+            margin-bottom: 10px;
+        }
+        .saved-badge {
+            background-color: #10b981;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            display: inline-block;
+            margin-bottom: 10px;
+        }
     </style> 
 """, unsafe_allow_html=True) 
 
@@ -192,25 +241,38 @@ if uploaded_files:
         with cols[i % 4]: st.image(img, use_container_width=True) 
 
     if st.button(t["btn"]): 
-        with st.spinner(t["loading"]): 
-            # Boş bırakılan alanlar için AI'a yardımcı bilgi gönderimi
-            p_type = st.session_state.prop_type if st.session_state.prop_type else "Property"
-            p_loc = st.session_state.location if st.session_state.location else "undisclosed location"
-            
-            expert_prompt = (f"Role: Senior Architect & Global Real Estate Strategist for SarSa AI. "
-                             f"Target Language: {st.session_state.target_lang_input}. "
-                             f"Property: {p_type} at {p_loc}. "
-                             f"Strategy: {st.session_state.tone}. "
-                             f"Structure: Split response using ## SECTION_1 (Main Listing), ## SECTION_2 (Social Media Kit - Captions & Hashtags), ## SECTION_3 (Cinematic Video Script), ## SECTION_4 (Technical Specifications).")
-            try: 
-                response = model.generate_content([expert_prompt] + images_for_ai) 
-                st.session_state.uretilen_ilan = response.text 
-            except Exception as e: 
-                st.error(f"{t['error']} {e}") 
+        # Check for unsaved changes before generating new content
+        if st.session_state.get("has_unsaved_changes", False):
+            st.warning(t["unsaved_warning"])
+        else:
+            with st.spinner(t["loading"]): 
+                # Boş bırakılan alanlar için AI'a yardımcı bilgi gönderimi
+                p_type = st.session_state.prop_type if st.session_state.prop_type else "Property"
+                p_loc = st.session_state.location if st.session_state.location else "undisclosed location"
+                
+                expert_prompt = (f"Role: Senior Architect & Global Real Estate Strategist for SarSa AI. "
+                                 f"Target Language: {st.session_state.target_lang_input}. "
+                                 f"Property: {p_type} at {p_loc}. "
+                                 f"Strategy: {st.session_state.tone}. "
+                                 f"Structure: Split response using ## SECTION_1 (Main Listing), ## SECTION_2 (Social Media Kit - Captions & Hashtags), ## SECTION_3 (Cinematic Video Script), ## SECTION_4 (Technical Specifications).")
+                try: 
+                    response = model.generate_content([expert_prompt] + images_for_ai) 
+                    st.session_state.uretilen_ilan = response.text 
+                    # Reset unsaved changes flag when new content is generated
+                    st.session_state.has_unsaved_changes = False
+                except Exception as e: 
+                    st.error(f"{t['error']} {e}") 
 
     if st.session_state.uretilen_ilan: 
         st.markdown("---") 
-        st.subheader(t["result"]) 
+        st.subheader(t["result"])
+        
+        # Show unsaved changes indicator
+        if st.session_state.get("has_unsaved_changes", False):
+            st.markdown(f"<span class='unsaved-badge'>{t['unsaved_indicator']}</span>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"<span class='saved-badge'>{t['saved_indicator']}</span>", unsafe_allow_html=True)
+        
         raw_text = st.session_state.uretilen_ilan 
         parts = raw_text.split("##") 
         sec1, sec2, sec3, sec4 = "", "", "", "" 
@@ -222,15 +284,29 @@ if uploaded_files:
 
         tab1, tab2, tab3, tab4 = st.tabs([t["tab_main"], t["tab_social"], t["tab_video"], t["tab_tech"]]) 
          
-        with tab1: res_ana = st.text_area(t["label_main"], value=sec1 if sec1 else raw_text, height=400, key="txt_ana") 
-        with tab2: res_sosyal = st.text_area(t["label_social"], value=sec2, height=400, key="txt_sosyal") 
-        with tab3: res_video = st.text_area(t["label_video"], value=sec3, height=400, key="txt_video") 
-        with tab4: res_teknik = st.text_area(t["label_tech"], value=sec4, height=400, key="txt_teknik") 
+        with tab1: 
+            res_ana = st.text_area(t["label_main"], value=sec1 if sec1 else raw_text, height=400, key="txt_ana")
+            # Mark as unsaved when user types
+            if res_ana != (sec1 if sec1 else raw_text):
+                st.session_state.has_unsaved_changes = True
+        with tab2: 
+            res_sosyal = st.text_area(t["label_social"], value=sec2, height=400, key="txt_sosyal")
+            if res_sosyal != sec2:
+                st.session_state.has_unsaved_changes = True
+        with tab3: 
+            res_video = st.text_area(t["label_video"], value=sec3, height=400, key="txt_video")
+            if res_video != sec3:
+                st.session_state.has_unsaved_changes = True
+        with tab4: 
+            res_teknik = st.text_area(t["label_tech"], value=sec4, height=400, key="txt_teknik")
+            if res_teknik != sec4:
+                st.session_state.has_unsaved_changes = True
           
         c1, c2 = st.columns(2) 
         with c1: 
             if st.button(t["save_btn"]): 
                 st.session_state.uretilen_ilan = f"## SECTION_1\n{res_ana}\n\n## SECTION_2\n{res_sosyal}\n\n## SECTION_3\n{res_video}\n\n## SECTION_4\n{res_teknik}"
+                st.session_state.has_unsaved_changes = False
                 st.success(t["saved_msg"]) 
         with c2: 
             st.download_button(t["download"], data=st.session_state.uretilen_ilan, file_name="sarsa_ai_export.txt") 
