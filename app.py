@@ -1,314 +1,536 @@
-import streamlit as st 
-from PIL import Image 
-import google.generativeai as genai 
-import os 
+import streamlit as st
+from PIL import Image
+import google.generativeai as genai
+import os
+import json
+import hashlib
+import io
+import zipfile
+from datetime import datetime
+from pathlib import Path
+import time
 
-# --- AI YAPILANDIRMASI --- 
-GOOGLE_API_KEY = st.secrets["GEMINI_API_KEY"] 
-genai.configure(api_key=GOOGLE_API_KEY) 
-MODEL_NAME = 'gemini-2.5-flash'  
-model = genai.GenerativeModel(MODEL_NAME) 
+# CONFIGURATION
+st.set_page_config(
+    page_title="SarSa AI | Professional Real Estate Marketing Suite",
+    page_icon="🏢",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# --- SAYFA AYARLARI --- 
-st.set_page_config(page_title="SarSa AI | Real Estate Analysis & Marketing Engine", page_icon="🏢", layout="wide") 
+# Initialize AI
+GOOGLE_API_KEY = st.secrets.get("GEMINI_API_KEY", "")
+if GOOGLE_API_KEY:
+    genai.configure(api_key=GOOGLE_API_KEY)
+    model = genai.GenerativeModel('gemini-2.5-flash')
 
-# --- HIZLANDIRICI --- 
-@st.cache_data 
-def load_logo(file_path): 
-    if os.path.exists(file_path): return Image.open(file_path) 
-    return None 
+# Data paths
+DATA_DIR = Path("data")
+DATA_DIR.mkdir(exist_ok=True)
+USERS_FILE = DATA_DIR / "users.json"
+PROPERTIES_FILE = DATA_DIR / "properties.json"
 
-# --- GLOBAL DİL SİSTEMİ (PLACEHOLDER VE VARSAYILAN AYAR GÜNCELLEMESİ) --- 
-ui_languages = { 
-    "English": { 
-        "title": "SarSa AI | Real Estate Analysis & Marketing Engine", 
-        "service_desc": "All-in-One Visual Property Intelligence & Global Sales Automation", 
-        "subtitle": "Transform property photos into premium listings, social media kits, cinematic video scripts, and technical data sheets instantly.",
-        "settings": "⚙️ Configuration", "target_lang": "✍️ Write Listing In...", "prop_type": "Property Type", "price": "Market Price", "location": "Location", "tone": "Strategy",
-        "tones": ["Standard Pro", "Ultra-Luxury", "Investment Potential", "Modern Minimalist", "Family Comfort"],
-        "ph_prop": "E.g., 3+1 Apartment, Luxury Villa...", "ph_price": "E.g., $500,000 or £2,000/mo...", "ph_loc": "E.g., Manhattan, NY or London, UK...",
-        "custom_inst": "📝 Special Notes", "custom_inst_ph": "E.g., High ceilings, near metro...", "btn": "🚀 GENERATE COMPLETE MARKETING ASSETS", "upload_label": "📸 Drop Property Photos Here",
-        "result": "💎 Executive Preview", "loading": "Crafting your premium marketing ecosystem...", "empty": "Awaiting visuals to start professional analysis.", "download": "📥 Export TXT", "save_btn": "💾 Save Changes", "saved_msg": "✅ Saved!", "error": "Error:",
-        "tab_main": "📝 Prime Listing", "tab_social": "📱 Social Media Kit", "tab_video": "🎬 Video Scripts", "tab_tech": "⚙️ Technical Specs", "label_main": "Sales Copy", "label_social": "Social Media Content", "label_video": "Video Script", "label_tech": "Technical Specifications",
-        "unsaved_warning": "⚠️ You have unsaved changes! Click 'Save Changes' before generating new content.",
-        "unsaved_indicator": "📝 Unsaved Changes",
-        "saved_indicator": "✅ All Changes Saved"
-    }, 
-    "Türkçe": { 
-        "title": "SarSa AI | Gayrimenkul Analiz ve Pazarlama Motoru", 
-        "service_desc": "Hepsi Bir Arada Görsel Mülk Zekası ve Küresel Satış Otomasyonu", 
-        "subtitle": "Mülk fotoğraflarını anında profesyonel ilanlara, sosyal medya kitlerine, sinematik video senaryolarına ve teknik şartnamelere dönüştürün.",
-        "settings": "⚙️ Yapılandırma", "target_lang": "✍️ İlan Yazım Dili...", "prop_type": "Emlak Tipi", "price": "Pazar Fiyatı", "location": "Konum", "tone": "Strateji",
-        "tones": ["Standart Profesyonel", "Ultra-Lüks", "Yatırım Potansiyeli", "Modern Minimalist", "Aile Konforu"],
-        "ph_prop": "Örn: 3+1 Daire, Müstakil Villa...", "ph_price": "Örn: 5.000.000 TL veya $2.500/ay...", "ph_loc": "Örn: Beşiktaş, İstanbul...",
-        "custom_inst": "📝 Özel Notlar", "custom_inst_ph": "Örn: Yüksek tavanlar, metroya yakın...", "btn": "🚀 TÜM PAZARLAMA VARLIKLARINI OLUŞTUR", "upload_label": "📸 Fotoğrafları Buraya Bırakın",
-        "result": "💎 Yönetici Önizlemesi", "loading": "Premium pazarlama ekosisteminiz hazırlanıyor...", "empty": "Profesyonel analiz için görsel bekleniyor.", "download": "📥 TXT Olarak İndir", "save_btn": "💾 Kaydet", "saved_msg": "✅ Kaydedildi!", "error": "Hata:",
-        "tab_main": "📝 Ana İlan", "tab_social": "📱 Sosyal Medya Kiti", "tab_video": "🎬 Video Senaryoları", "tab_tech": "⚙️ Teknik Özellikler", "label_main": "Satış Metni", "label_social": "Sosyal Medya", "label_video": "Video Script", "label_tech": "Teknik Detaylar",
-        "unsaved_warning": "⚠️ Kaydedilmemiş değişiklikleriniz var! Yeni içerik oluşturmadan önce 'Kaydet' butonuna tıklayın.",
-        "unsaved_indicator": "📝 Kaydedilmemiş Değişiklikler",
-        "saved_indicator": "✅ Tüm Değişiklikler Kaydedildi"
-    },
-    "Español": { 
-        "title": "SarSa AI | Motor de Marketing y Análisis Inmobiliario", 
-        "service_desc": "Inteligencia Visual de Propiedades y Automatización de Ventas Globales", 
-        "subtitle": "Convierta fotos en anuncios premium, kits de redes sociales, guiones de video y fichas técnicas al instante.",
-        "settings": "⚙️ Configuración", "target_lang": "✍️ Escribir en...", "prop_type": "Tipo de Propiedad", "price": "Precio de Mercado", "location": "Ubicación", "tone": "Estrategia",
-        "tones": ["Profesional Estándar", "Ultra-Lujo", "Potencial de Inversión", "Minimalista Moderno", "Confort Familiar"],
-        "ph_prop": "Ej: Apartamento 3+1, Villa de Lujo...", "ph_price": "Ej: $500.000 o €1.500/mes...", "ph_loc": "Ej: Madrid, España...",
-        "custom_inst": "📝 Notas Especiales", "custom_inst_ph": "Ej: Techos altos, cerca del metro...", "btn": "🚀 GENERAR ACTIVOS DE MARKETING COMPLETOS", "upload_label": "📸 Subir Fotos Aquí",
-        "result": "💎 Vista Previa Ejecutiva", "loading": "Creando su ecosistema de marketing...", "empty": "Esperando imágenes para análisis profesional.", "download": "📥 Exportar TXT", "save_btn": "💾 Guardar Cambios", "saved_msg": "✅ ¡Guardado!", "error": "Error:",
-        "tab_main": "📝 Anuncio Premium", "tab_social": "📱 Kit de Redes", "tab_video": "🎬 Guiones de Video", "tab_tech": "⚙️ Especificaciones", "label_main": "Texto de Ventas", "label_social": "Contenido Social", "label_video": "Guion de Video", "label_tech": "Ficha Técnica",
-        "unsaved_warning": "⚠️ Tienes cambios sin guardar. Haz clic en 'Guardar Cambios' antes de generar nuevo contenido.",
-        "unsaved_indicator": "📝 Cambios Sin Guardar",
-        "saved_indicator": "✅ Todos los Cambios Guardados"
-    },
-    "Deutsch": { 
-        "title": "SarSa AI | Immobilienanalyse & Marketing-Plattform", 
-        "service_desc": "All-in-One Visuelle Objektintelligenz & Globale Verkaufsautomatisierung", 
-        "subtitle": "Verwandeln Sie Fotos sofort in Premium-Exposés, Social-Media-Kits, Videoskripte und Datenblätter.",
-        "settings": "⚙️ Konfiguration", "target_lang": "✍️ Erstellen in...", "prop_type": "Objekttyp", "price": "Marktpreis", "location": "Standort", "tone": "Strategie",
-        "tones": ["Standard-Profi", "Ultra-Luxus", "Investitionspotenzial", "Modern-Minimalistisch", "Familienkomfort"],
-        "ph_prop": "Z.B. 3-Zimmer-Wohnung, Luxusvilla...", "ph_price": "Z.B. 500.000€ oder 2.000€/Monat...", "ph_loc": "Z.B. Berlin, Deutschland...",
-        "custom_inst": "📝 Notizen", "custom_inst_ph": "Z.B. Hohe Decken, U-Bahn-Nähe...", "btn": "🚀 KOMPLETTE MARKETING-ASSETS ERSTELLEN", "upload_label": "📸 Fotos hier hochladen",
-        "result": "💎 Executive-Vorschau", "loading": "Ihr Marketing-Ökosystem wird erstellt...", "empty": "Warte auf Bilder für die Analyse.", "download": "📥 TXT Exportieren", "save_btn": "💾 Speichern", "saved_msg": "✅ Gespeichert!", "error": "Fehler:",
-        "tab_main": "📝 Premium-Exposé", "tab_social": "📱 Social Media Kit", "tab_video": "🎬 Videoskripte", "tab_tech": "⚙️ Tech-Details", "label_main": "Verkaufstext", "label_social": "Social Media Content", "label_video": "Video-Skript", "label_tech": "Technische Daten",
-        "unsaved_warning": "⚠️ Ungespeicherte Änderungen! Klicken Sie auf 'Speichern', bevor Sie neue Inhalte generieren.",
-        "unsaved_indicator": "📝 Ungespeicherte Änderungen",
-        "saved_indicator": "✅ Alle Änderungen Gespeichert"
-    },
-    "Français": { 
-        "title": "SarSa AI | Moteur d'Analyse et de Marketing Immobilier", 
-        "service_desc": "Intelligence Visuelle Immobilière et Automatisation des Ventes Globales", 
-        "subtitle": "Transformez vos photos en annonces premium, kits réseaux sociaux, scripts vidéo et fiches techniques.",
-        "settings": "⚙️ Configuration", "target_lang": "✍️ Rédiger en...", "prop_type": "Type de Bien", "price": "Prix du Marché", "location": "Localisation", "tone": "Stratégie",
-        "tones": ["Standard Pro", "Ultra-Luxe", "Potentiel d'Investissement", "Minimaliste Moderne", "Confort Familiar"],
-        "ph_prop": "Ex: Appartement T4, Villa de Luxe...", "ph_price": "Ex: 500.000€ ou 1.500€/mois...", "ph_loc": "Ex: Paris, France...",
-        "custom_inst": "📝 Notes Spéciales", "custom_inst_ph": "Ex: Plafonds hauts, proche métro...", "btn": "🚀 GÉNÉRER LES ACTIFS MARKETING COMPLETS", "upload_label": "📸 Déposer les Photos Ici",
-        "result": "💎 Aperçu Exécutif", "loading": "Préparation de votre écosystème marketing...", "empty": "En attente d'images pour analyse.", "download": "📥 Exporter TXT", "save_btn": "💾 Enregistrer", "saved_msg": "✅ Enregistré !", "error": "Erreur :",
-        "tab_main": "📝 Annonce Premium", "tab_social": "📱 Kit Réseaux Sociaux", "tab_video": "🎬 Scripts Vidéo", "tab_tech": "⚙️ Spécifications", "label_main": "Texte de Vente", "label_social": "Contenu Social", "label_video": "Script Vidéo", "label_tech": "Détails Techniques",
-        "unsaved_warning": "⚠️ Modifications non enregistrées ! Cliquez sur 'Enregistrer' avant de générer du nouveau contenu.",
-        "unsaved_indicator": "📝 Modifications Non Enregistrées",
-        "saved_indicator": "✅ Toutes les Modifications Enregistrées"
-    },
-    "Português": { 
-        "title": "SarSa AI | Motor de Marketing e Análise Imobiliária", 
-        "service_desc": "Inteligência Visual Imobiliária e Automação de Vendas Globais", 
-        "subtitle": "Transforme fotos em anúncios premium, kits de redes sociais, roteiros de vídeo e fichas técnicas.",
-        "settings": "⚙️ Configuração", "target_lang": "✍️ Escrever em...", "prop_type": "Tipo de Imóvel", "price": "Preço de Mercado", "location": "Localização", "tone": "Estrategia",
-        "tones": ["Profissional Padrão", "Ultra-Luxo", "Potencial de Investimento", "Minimalista Moderno", "Conforto Familiar"],
-        "ph_prop": "Ex: Apartamento T3, Moradia de Luxo...", "ph_price": "Ex: 500.000€ ou 1.500€/mês...", "ph_loc": "Ex: Lisboa, Portugal...",
-        "custom_inst": "📝 Notas Especiais", "custom_inst_ph": "Ex: Tetos altos, perto do metrô...", "btn": "🚀 GERAR ATIVOS DE MARKETING COMPLETOS", "upload_label": "📸 Enviar Fotos Aqui",
-        "result": "💎 Pré-visualização Executiva", "loading": "Preparando seu ecossistema de marketing...", "empty": "Aguardando imagens para análise.", "download": "📥 Exportar TXT", "save_btn": "💾 Salvar Alterações", "saved_msg": "✅ Salvo!", "error": "Erro:",
-        "tab_main": "📝 Anúncio Premium", "tab_social": "📱 Kit Redes Sociais", "tab_video": "🎬 Roteiros de Vídeo", "tab_tech": "⚙️ Detalhes", "label_main": "Texto de Vendas", "label_social": "Conteúdo Social", "label_video": "Script de Vídeo", "label_tech": "Especificações Técnicas",
-        "unsaved_warning": "⚠️ Alterações não salvas! Clique em 'Salvar Alterações' antes de gerar novo conteúdo.",
-        "unsaved_indicator": "📝 Alterações Não Salvas",
-        "saved_indicator": "✅ Todas as Alterações Salvas"
-    },
-    "日本語": { 
-        "title": "SarSa AI | 不動産分析＆マーケティングエンジン", 
-        "service_desc": "オールインワン物件インテリジェンス＆グローバル販売自動化", 
-        "subtitle": "物件写真をプレミアム広告、SNSキット、動画台本、技術仕様書に瞬時に変換。",
-        "settings": "⚙️ 設定", "target_lang": "✍️ 作成言語...", "prop_type": "物件種別", "price": "市場価格", "location": "所在地", "tone": "戦略",
-        "tones": ["スタンダードプロ", "ウルトララグジュアリー", "投資ポテンシャル", "モダンミニマリスト", "ファミリーコンフォート"],
-        "ph_prop": "例：3LDKマンション、高級別荘...", "ph_price": "例：5000万円、月20万円...", "ph_loc": "例：東京都港区...",
-        "custom_inst": "📝 特記事項", "custom_inst_ph": "例：高い天井、駅近...", "btn": "🚀 完全なマーケティング資産を生成", "upload_label": "📸 ここに写真をアップロード",
-        "result": "💎 エグゼクティブプレビュー", "loading": "マーケティングエコシステムを構築中...", "empty": "分析用の画像を待機中。", "download": "📥 TXT出力", "save_btn": "💾 変更を保存", "saved_msg": "✅ 保存完了！", "error": "エラー:",
-        "tab_main": "📝 プレミアム広告", "tab_social": "📱 SNSキット", "tab_video": "🎬 動画台本", "tab_tech": "⚙️ 技術仕様", "label_main": "セールスコピー", "label_social": "SNSコンテンツ", "label_video": "動画台本", "label_tech": "技術仕様",
-        "unsaved_warning": "⚠️ 保存されていない変更があります！新しいコンテンツを生成する前に「変更を保存」をクリックしてください。",
-        "unsaved_indicator": "📝 未保存の変更",
-        "saved_indicator": "✅ すべての変更を保存済み"
-    },
-    "中文 (简体)": { 
-        "title": "SarSa AI | 房地产分析与营销引擎", 
-        "service_desc": "全方位房产视觉智能与全球销售自动化", 
-        "subtitle": "立即将房产照片转化为优质房源描述、社交媒体包、电影级视频脚本和技术规格。",
-        "settings": "⚙️ 配置", "target_lang": "✍️ 编写语言...", "prop_type": "房产类型", "price": "市场价格", "location": "地点", "tone": "策略",
-        "tones": ["标准专业", "顶奢豪宅", "投资潜力", "现代简约", "家庭舒适"],
-        "ph_prop": "例如：3居室公寓，豪华别墅...", "ph_price": "例如：$500,000 或 $2,000/月...", "ph_loc": "例如：上海市浦东新区...",
-        "custom_inst": "📝 特别备注", "custom_inst_ph": "例如：挑高天花板，靠近地铁...", "btn": "🚀 生成完整营销资产", "upload_label": "📸 在此处上传照片",
-        "result": "💎 高管预览", "loading": "正在打造您的营销生态系统...", "empty": "等待图像进行分析。", "download": "📥 导出 TXT", "save_btn": "💾 保存更改", "saved_msg": "✅ 已保存！", "error": "错误:",
-        "tab_main": "📝 优质房源", "tab_social": "📱 社交媒体包", "tab_video": "🎬 视频脚本", "tab_tech": "⚙️ 技术细节", "label_main": "销售文案", "label_social": "社媒内容", "label_video": "视频脚本", "label_tech": "技术规格",
-        "unsaved_warning": "⚠️ 有未保存的更改！在生成新内容之前，请点击「保存更改」。",
-        "unsaved_indicator": "📝 未保存的更改",
-        "saved_indicator": "✅ 所有更改已保存"
-    },
-    "العربية": { 
-        "title": "SarSa AI | محرك تحليل وتسويق العقارات", 
-        "service_desc": "ذكاء العقارات البصري المتكامل وأتمتة المبيعات العالمية", 
-        "subtitle": "حوّل صور العقارات إلى إعلانات مميزة، باقات تواصل اجتماعي، سيناريوهات فيديو، ومواصفات فنية فوراً.",
-        "settings": "⚙️ الإعدادات", "target_lang": "✍️ لغة الكتابة...", "prop_type": "نوع العقار", "price": "سعر السوق", "location": "الموقع", "tone": "الاستراتيجية",
-        "tones": ["احترافي قياسي", "فخامة فائقة", "إمكانات استثمارية", "عصري بسيط", "راحة عائلية"],
-        "ph_prop": "مثال: شقة 3+1، فيلا فاخرة...", "ph_price": "مثال: $500,000 أو $2,000 شهرياً...", "ph_loc": "مثال: دبي، الإمارات...",
-        "custom_inst": "📝 ملاحظات خاصة", "custom_inst_ph": "مثال: أسقف عالية، بالقرب من المترو...", "btn": "🚀 إنشاء أصول تسويقية متكاملة", "upload_label": "📸 ضع الصور هنا",
-        "result": "💎 معاينة تنفيذية", "loading": "جاري تجهيز منظومتك التسويقية الفاخرة...", "empty": "في انتظار الصور لبدء التحليل المهني.", "download": "📥 تصدير TXT", "save_btn": "💾 حفظ التغييرات", "saved_msg": "✅ تم الحفظ!", "error": "خطأ:",
-        "tab_main": "📝 إعلان مميز", "tab_social": "📱 باقة التواصل", "tab_video": "🎬 سيناريوهات الفيديو", "tab_tech": "⚙️ تفاصيل", "label_main": "نص المبيعات", "label_social": "محتوى التواصل", "label_video": "سيناريو الفيديو", "label_tech": "المواصفات الفنية",
-        "unsaved_warning": "⚠️ لديك تغييرات غير محفوظة! انقر على 'حفظ التغييرات' قبل إنشاء محتوى جديد.",
-        "unsaved_indicator": "📝 تغييرات غير محفوظة",
-        "saved_indicator": "✅ تم حفظ جميع التغييرات"
+# DATA FUNCTIONS
+def load_json(filepath, default=None):
+    if default is None:
+        default = {}
+    try:
+        if filepath.exists():
+            with open(filepath, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except:
+        pass
+    return default
+
+def save_json(filepath, data):
+    try:
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        return True
+    except:
+        return False
+
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def get_user_data():
+    return load_json(USERS_FILE, {"users": {}})
+
+def save_user_data(data):
+    return save_json(USERS_FILE, data)
+
+def get_properties_data():
+    return load_json(PROPERTIES_FILE, {"properties": []})
+
+def save_properties_data(data):
+    return save_json(PROPERTIES_FILE, data)
+
+# SESSION STATE
+def init_session_state():
+    defaults = {
+        "authenticated": False, "user_email": None, "user_name": None, "user_tier": "free",
+        "credits_used_this_month": 0, "current_property_id": None, "property_name": "",
+        "prop_type": "", "price": "", "location": "", "tone": "", "custom_inst": "",
+        "target_lang_input": "English", "uploaded_photos": [], "hero_photo_index": 0,
+        "content_generated": False, "content_saved": False, "has_unsaved_changes": False,
+        "generated_sections": {"prime_listing": "", "social_media": "", "video_script": "", "technical_specs": ""},
+        "current_view": "dashboard", "show_upgrade_modal": False
     }
-} 
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
 
-# --- SESSION STATE (TEMİZ BAŞLANGIÇ AYARLARI) --- 
-# Başlangıç değerleri boş bırakıldı ki placeholder'lar görünsün.
-for key, val in [("uretilen_ilan", ""), ("prop_type", ""), ("price", ""), ("location", ""), ("tone", ""), ("custom_inst", ""), ("target_lang_input", "English"), ("has_unsaved_changes", False)]:
-    if key not in st.session_state: st.session_state[key] = val
+init_session_state()
 
-# --- CSS (STİL KORUNDU) --- 
-st.markdown(""" 
-    <style> 
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap'); 
-        html, body, [class*="st-"] { font-family: 'Plus Jakarta Sans', sans-serif; } 
-        .stApp { background-color: #f8fafc; } 
-         
-        div[data-testid="stInputInstructions"] { display: none !important; }
+# LANGUAGE SYSTEM
+LANGUAGES = {
+    "English": {
+        "brand_name": "SarSa AI", "nav_dashboard": "Dashboard", "nav_new_property": "New Property",
+        "nav_logout": "Logout", "dashboard_title": "Property Marketing Dashboard",
+        "btn_create_new": "Create New Listing", "recent_properties": "Recent Properties",
+        "empty_state_title": "No properties yet", "editor_title": "Create Marketing Assets",
+        "section_basic_info": "Basic Information", "section_photos": "Property Photos",
+        "field_property_name": "Property Name", "field_property_type": "Property Type",
+        "field_price": "Market Price", "field_location": "Location",
+        "field_strategy": "Marketing Strategy", "ph_property_name": "e.g., Sunset Villa",
+        "ph_property_type": "e.g., Luxury 4BR Villa", "ph_price": "e.g., $1,250,000",
+        "strategies": ["Standard Professional", "Ultra-Luxury Premium", "Investment Opportunity", "Modern Minimalist", "Family-Friendly"],
+        "btn_generate": "GENERATE MARKETING PACKAGE", "tab_prime": "Prime Listing",
+        "tab_social": "Social Media Kit", "tab_video": "Video Script", "tab_tech": "Technical Specs",
+        "save_btn": "Save Changes", "saved_msg": "Saved successfully",
+        "unsaved_indicator": "Unsaved Changes", "saved_indicator": "All Changes Saved",
+        "generated_indicator": "Generated - Save to preserve",
+        "warning_unsaved": "You have unsaved changes. Save first.",
+        "download_prime": "Listing (TXT)", "download_social": "Social (TXT)",
+        "download_video": "Video (TXT)", "download_tech": "Tech (TXT)",
+        "download_all": "Download All (ZIP)",
+        "filename_prime": "{property_name}_Prime_Listing.txt",
+        "filename_social": "{property_name}_Social_Kit.txt",
+        "filename_video": "{property_name}_Video_Script.txt",
+        "filename_tech": "{property_name}_Tech_Specs.txt",
+        "filename_all": "{property_name}_Complete_Package.zip"
+    }
+}
 
-        .block-container { background: white; padding: 3rem !important; border-radius: 20px; box-shadow: 0 15px 45px rgba(0,0,0,0.04); margin-top: 2rem; border: 1px solid #e2e8f0; } 
-        h1 { color: #0f172a !important; font-weight: 800 !important; text-align: center; } 
-          
-        button, [data-baseweb="tab"], [data-testid="stFileUploader"],  
-        div[data-baseweb="select"], div[role="button"], .stSelectbox div { 
-            cursor: pointer !important; 
-        } 
-         
-        .stTextInput input, .stTextArea textarea { cursor: text !important; }
+for lang in ["Türkçe", "Español", "Deutsch", "Français", "Português", "日本語", "中文", "العربية"]:
+    LANGUAGES[lang] = LANGUAGES["English"].copy()
 
-        span[data-testid="stIconMaterial"] { font-size: 0px !important; color: transparent !important; }
-        span[data-testid="stIconMaterial"]::before { content: "⬅️" !important; font-size: 18px !important; color: #0f172a !important; visibility: visible !important; display: block !important; cursor: pointer !important; }
+def get_text(key, **kwargs):
+    lang = st.session_state.get("target_lang_input", "English")
+    text = LANGUAGES.get(lang, LANGUAGES["English"]).get(key, key)
+    if isinstance(text, list):
+        return text
+    try:
+        return text.format(**kwargs)
+    except:
+        return text
 
-        .stButton>button { background: #0f172a; color: white !important; border-radius: 10px; padding: 14px; font-weight: 600; width: 100%; border: none; }
-        .stButton>button:hover { background: #1e293b; box-shadow: 0 4px 12px rgba(0,0,0,0.1); } 
-         
-        .stTabs [aria-selected="true"] { background-color: #0f172a !important; color: white !important; border-radius: 8px 8px 0 0; }
-        
-        /* Unsaved changes indicator styling */
-        .unsaved-badge {
-            background-color: #f59e0b;
-            color: white;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            display: inline-block;
-            margin-bottom: 10px;
-        }
-        .saved-badge {
-            background-color: #10b981;
-            color: white;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            display: inline-block;
-            margin-bottom: 10px;
-        }
-    </style> 
-""", unsafe_allow_html=True) 
+# CSS
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+* { font-family: 'Inter', sans-serif !important; }
+.stApp { background-color: #f8fafc; }
+h1, h2, h3 { color: #0f172a !important; }
+.stButton>button {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white !important;
+    border-radius: 10px;
+    padding: 0.75rem 1.5rem;
+    font-weight: 600;
+    border: none;
+    transition: all 0.2s;
+}
+.stButton>button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
+}
+.stButton>button:disabled {
+    background: #cbd5e1;
+    cursor: not-allowed;
+    transform: none;
+}
+.badge-success {
+    background: #f0fdf4;
+    color: #059669;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: inline-block;
+    margin-bottom: 10px;
+}
+.badge-warning {
+    background: #fef3c7;
+    color: #d97706;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: inline-block;
+    margin-bottom: 10px;
+}
+.badge-info {
+    background: #eff6ff;
+    color: #1d4ed8;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: inline-block;
+    margin-bottom: 10px;
+}
+.property-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    transition: all 0.2s;
+    margin-bottom: 1rem;
+}
+.property-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    border-color: #3b82f6;
+}
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+</style>
+""", unsafe_allow_html=True)
 
-# --- SIDEBAR --- 
-with st.sidebar: 
-    logo_img = load_logo("SarSa_Logo_Transparent.png") 
-    if logo_img: st.image(logo_img, use_container_width=True) 
-    else: st.markdown("<h2 style='text-align:center; color:#0f172a;'>SARSA AI</h2>", unsafe_allow_html=True) 
-      
-    current_ui_lang = st.selectbox("🌐 Interface Language", list(ui_languages.keys()), index=0)   
-    t = ui_languages[current_ui_lang] 
-      
-    st.markdown("---") 
-    st.header(t["settings"]) 
-    st.session_state.target_lang_input = st.text_input(t["target_lang"], value=st.session_state.target_lang_input) 
-    
-    # Placeholder eklenen girişler:
-    st.session_state.prop_type = st.text_input(t["prop_type"], value=st.session_state.prop_type, placeholder=t["ph_prop"]) 
-    st.session_state.price = st.text_input(t["price"], value=st.session_state.price, placeholder=t["ph_price"]) 
-    st.session_state.location = st.text_input(t["location"], value=st.session_state.location, placeholder=t["ph_loc"]) 
-      
-    # Varsayılan strateji artık listenin ilk elemanı olan "Standard Pro / Standart Profesyonel"
-    current_tone_idx = t["tones"].index(st.session_state.tone) if st.session_state.tone in t["tones"] else 0
-    st.session_state.tone = st.selectbox(t["tone"], t["tones"], index=current_tone_idx) 
-    st.session_state.custom_inst = st.text_area(t["custom_inst"], value=st.session_state.custom_inst, placeholder=t["custom_inst_ph"]) 
+# AUTHENTICATION
+def login_page():
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("<div style='text-align: center; padding: 3rem 0;'><h1>🏢</h1><h2>SarSa AI</h2><p>Professional Real Estate Marketing</p></div>", unsafe_allow_html=True)
+        tab1, tab2 = st.tabs(["Sign In", "Create Account"])
+        with tab1:
+            with st.form("login"):
+                email = st.text_input("Email")
+                password = st.text_input("Password", type="password")
+                if st.form_submit_button("Sign In", use_container_width=True):
+                    data = get_user_data()
+                    if email in data["users"] and data["users"][email]["password"] == hash_password(password):
+                        st.session_state.authenticated = True
+                        st.session_state.user_email = email
+                        st.session_state.user_name = data["users"][email].get("name", email)
+                        st.session_state.user_tier = data["users"][email].get("tier", "free")
+                        st.rerun()
+                    else:
+                        st.error("Invalid credentials")
+        with tab2:
+            with st.form("signup"):
+                name = st.text_input("Full Name")
+                email = st.text_input("Email")
+                password = st.text_input("Password", type="password")
+                if st.form_submit_button("Create Account", use_container_width=True):
+                    if len(password) < 8:
+                        st.error("Password too short")
+                    elif email and name:
+                        data = get_user_data()
+                        if email in data["users"]:
+                            st.error("Email exists")
+                        else:
+                            data["users"][email] = {
+                                "name": name, "email": email,
+                                "password": hash_password(password),
+                                "tier": "free", "created_at": datetime.now().isoformat()
+                            }
+                            save_user_data(data)
+                            st.success("Account created! Please sign in.")
 
-# --- ANA EKRAN --- 
-st.markdown(f"<h1>🏢 {t['title']}</h1>", unsafe_allow_html=True) 
-st.markdown(f"<p style='text-align:center; color:#0f172a; font-weight:700; font-size:1.4rem; letter-spacing:0.5px; margin-bottom:5px;'>{t['service_desc']}</p>", unsafe_allow_html=True) 
-st.markdown(f"<div style='text-align:center; color:#64748b; font-size:1.1rem; max-width:850px; margin: 0 auto 2rem auto; line-height:1.5;'>{t['subtitle']}</div>", unsafe_allow_html=True) 
+# SIDEBAR
+def render_sidebar():
+    with st.sidebar:
+        st.markdown("<h2 style='text-align: center;'>🏢 SarSa AI</h2>", unsafe_allow_html=True)
+        st.markdown("---")
+        if st.session_state.user_name:
+            st.markdown(f"<p><b>{st.session_state.user_name}</b></p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size: 0.8rem; color: #64748b;'>{st.session_state.user_tier.upper()}</p>", unsafe_allow_html=True)
 
-uploaded_files = st.file_uploader(t["upload_label"], type=["jpg", "png", "webp", "jpeg"], accept_multiple_files=True) 
+        if st.button("📊 Dashboard", use_container_width=True, type="primary" if st.session_state.current_view == "dashboard" else "secondary"):
+            st.session_state.current_view = "dashboard"
+            st.rerun()
+        if st.button("➕ New Property", use_container_width=True, type="primary" if st.session_state.current_view == "editor" else "secondary"):
+            st.session_state.current_view = "editor"
+            st.rerun()
+        if st.button("🏠 My Properties", use_container_width=True, type="primary" if st.session_state.current_view == "properties" else "secondary"):
+            st.session_state.current_view = "properties"
+            st.rerun()
 
-if uploaded_files: 
-    cols = st.columns(4) 
-    images_for_ai = [Image.open(f) for f in uploaded_files] 
-    for i, img in enumerate(images_for_ai): 
-        with cols[i % 4]: st.image(img, use_container_width=True) 
+        st.markdown("---")
+        credits = 3 if st.session_state.user_tier == "free" else (50 if st.session_state.user_tier == "pro" else 999999)
+        used = st.session_state.credits_used_this_month
+        st.markdown(f"<p>Credits: {used}/{credits if credits < 999999 else '∞'}</p>", unsafe_allow_html=True)
 
-    if st.button(t["btn"]): 
-        # Check for unsaved changes before generating new content
-        if st.session_state.get("has_unsaved_changes", False):
-            st.warning(t["unsaved_warning"])
-        else:
-            with st.spinner(t["loading"]): 
-                # Boş bırakılan alanlar için AI'a yardımcı bilgi gönderimi
-                p_type = st.session_state.prop_type if st.session_state.prop_type else "Property"
-                p_loc = st.session_state.location if st.session_state.location else "undisclosed location"
-                
-                expert_prompt = (f"Role: Senior Architect & Global Real Estate Strategist for SarSa AI. "
-                                 f"Target Language: {st.session_state.target_lang_input}. "
-                                 f"Property: {p_type} at {p_loc}. "
-                                 f"Strategy: {st.session_state.tone}. "
-                                 f"Structure: Split response using ## SECTION_1 (Main Listing), ## SECTION_2 (Social Media Kit - Captions & Hashtags), ## SECTION_3 (Cinematic Video Script), ## SECTION_4 (Technical Specifications).")
-                try: 
-                    response = model.generate_content([expert_prompt] + images_for_ai) 
-                    st.session_state.uretilen_ilan = response.text 
-                    # Reset unsaved changes flag when new content is generated
-                    st.session_state.has_unsaved_changes = False
-                except Exception as e: 
-                    st.error(f"{t['error']} {e}") 
+        if st.button("🚪 Logout", use_container_width=True):
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
+            st.rerun()
 
-    if st.session_state.uretilen_ilan: 
-        st.markdown("---") 
-        st.subheader(t["result"])
-        
-        # Show unsaved changes indicator
-        if st.session_state.get("has_unsaved_changes", False):
-            st.markdown(f"<span class='unsaved-badge'>{t['unsaved_indicator']}</span>", unsafe_allow_html=True)
-        else:
-            st.markdown(f"<span class='saved-badge'>{t['saved_indicator']}</span>", unsafe_allow_html=True)
-        
-        raw_text = st.session_state.uretilen_ilan 
-        parts = raw_text.split("##") 
-        sec1, sec2, sec3, sec4 = "", "", "", "" 
-        for p in parts: 
-            if "SECTION_1" in p: sec1 = p.replace("SECTION_1", "").split(":", 1)[-1].strip() 
-            elif "SECTION_2" in p: sec2 = p.replace("SECTION_2", "").split(":", 1)[-1].strip() 
-            elif "SECTION_3" in p: sec3 = p.replace("SECTION_3", "").split(":", 1)[-1].strip() 
-            elif "SECTION_4" in p: sec4 = p.replace("SECTION_4", "").split(":", 1)[-1].strip() 
+# DASHBOARD
+def dashboard_view():
+    st.markdown("<h1>📊 Dashboard</h1>", unsafe_allow_html=True)
 
-        tab1, tab2, tab3, tab4 = st.tabs([t["tab_main"], t["tab_social"], t["tab_video"], t["tab_tech"]]) 
-         
-        with tab1: 
-            res_ana = st.text_area(t["label_main"], value=sec1 if sec1 else raw_text, height=400, key="txt_ana")
-            # Mark as unsaved when user types
-            if res_ana != (sec1 if sec1 else raw_text):
+    data = get_properties_data()
+    user_props = [p for p in data.get("properties", []) if p.get("user_email") == st.session_state.user_email]
+
+    cols = st.columns(4)
+    stats = [
+        (len(user_props), "Total Properties"),
+        (len([p for p in user_props if datetime.fromisoformat(p.get("created_at", "2000-01-01")).month == datetime.now().month]), "This Month"),
+        (max(0, 3 - st.session_state.credits_used_this_month), "Credits Left"),
+        ("24%", "Conversion")
+    ]
+    for col, (val, label) in zip(cols, stats):
+        with col:
+            st.markdown(f"<div style='background: white; padding: 1.5rem; border-radius: 12px; text-align: center; border: 1px solid #e2e8f0;'><h2 style='margin: 0; color: #0f172a;'>{val}</h2><p style='color: #64748b; margin: 0;'>{label}</p></div>", unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    if st.button("🚀 Create New Listing", use_container_width=True, type="primary"):
+        st.session_state.current_property_id = None
+        st.session_state.property_name = ""
+        st.session_state.prop_type = ""
+        st.session_state.content_generated = False
+        st.session_state.content_saved = False
+        st.session_state.has_unsaved_changes = False
+        st.session_state.generated_sections = {"prime_listing": "", "social_media": "", "video_script": "", "technical_specs": ""}
+        st.session_state.current_view = "editor"
+        st.rerun()
+
+    st.markdown("<br><h3>Recent Properties</h3>", unsafe_allow_html=True)
+
+    if not user_props:
+        st.info("No properties yet. Create your first listing!")
+    else:
+        user_props.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+        cols = st.columns(3)
+        for idx, prop in enumerate(user_props[:6]):
+            with cols[idx % 3]:
+                st.markdown(f"<div class='property-card'>", unsafe_allow_html=True)
+                st.markdown(f"<h4 style='margin: 0 0 0.5rem 0;'>{prop.get('name', 'Untitled')}</h4>", unsafe_allow_html=True)
+                st.markdown(f"<p style='color: #64748b; margin: 0;'>{prop.get('property_type', 'No type')}</p>", unsafe_allow_html=True)
+                st.markdown(f"<p style='margin: 0.5rem 0 0 0; font-weight: 600;'>{prop.get('price', 'No price')}</p>", unsafe_allow_html=True)
+                st.markdown("</div>", unsafe_allow_html=True)
+                if st.button("Open", key=f"open_{prop['id']}", use_container_width=True):
+                    load_property(prop['id'])
+                    st.session_state.current_view = "editor"
+                    st.rerun()
+
+def load_property(prop_id):
+    data = get_properties_data()
+    prop = next((p for p in data.get("properties", []) if p["id"] == prop_id), None)
+    if prop:
+        st.session_state.current_property_id = prop_id
+        st.session_state.property_name = prop.get("name", "")
+        st.session_state.prop_type = prop.get("property_type", "")
+        st.session_state.price = prop.get("price", "")
+        st.session_state.location = prop.get("location", "")
+        st.session_state.tone = prop.get("strategy", "")
+        st.session_state.target_lang_input = prop.get("target_language", "English")
+        st.session_state.custom_inst = prop.get("special_notes", "")
+        st.session_state.generated_sections = prop.get("sections", {})
+        st.session_state.content_generated = True
+        st.session_state.content_saved = True
+        st.session_state.has_unsaved_changes = False
+
+# EDITOR
+def editor_view():
+    credits_limit = 3 if st.session_state.user_tier == "free" else (50 if st.session_state.user_tier == "pro" else 999999)
+
+    if st.session_state.credits_used_this_month >= credits_limit:
+        st.error("Monthly limit reached. Upgrade your plan.")
+        return
+
+    st.markdown(f"<h1>{get_text('editor_title')}</h1>", unsafe_allow_html=True)
+
+    col1, col2 = st.columns([1, 2])
+
+    with col1:
+        st.markdown(f"<h3>{get_text('section_basic_info')}</h3>", unsafe_allow_html=True)
+        st.session_state.property_name = st.text_input(get_text("field_property_name"), value=st.session_state.property_name, placeholder=get_text("ph_property_name"))
+        st.session_state.prop_type = st.text_input(get_text("field_property_type"), value=st.session_state.prop_type, placeholder=get_text("ph_property_type"))
+        st.session_state.price = st.text_input(get_text("field_price"), value=st.session_state.price, placeholder=get_text("ph_price"))
+        st.session_state.location = st.text_input("Location", value=st.session_state.location)
+
+        strategies = get_text("strategies")
+        current = st.session_state.tone if st.session_state.tone in strategies else strategies[0]
+        st.session_state.tone = st.selectbox(get_text("field_strategy"), strategies, index=strategies.index(current) if current in strategies else 0)
+
+        langs = list(LANGUAGES.keys())
+        st.session_state.target_lang_input = st.selectbox("Output Language", langs, index=langs.index(st.session_state.target_lang_input) if st.session_state.target_lang_input in langs else 0)
+        st.session_state.custom_inst = st.text_area("Special Notes", value=st.session_state.custom_inst)
+
+    with col2:
+        st.markdown(f"<h3>{get_text('section_photos')}</h3>", unsafe_allow_html=True)
+        uploaded = st.file_uploader("Upload Photos", type=["jpg", "jpeg", "png", "webp"], accept_multiple_files=True)
+
+        if uploaded:
+            st.session_state.uploaded_photos = uploaded
+            cols = st.columns(min(len(uploaded), 4))
+            for idx, file in enumerate(uploaded):
+                with cols[idx % 4]:
+                    img = Image.open(file)
+                    is_hero = idx == st.session_state.hero_photo_index
+                    if is_hero:
+                        st.markdown("<span style='background: #f59e0b; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem;'>HERO</span>", unsafe_allow_html=True)
+                    st.image(img, use_container_width=True)
+                    if st.button("⭐ Set Hero", key=f"hero_{idx}"):
+                        st.session_state.hero_photo_index = idx
+                        st.rerun()
+
+        if st.session_state.has_unsaved_changes:
+            st.warning(get_text("warning_unsaved"))
+
+        can_generate = st.session_state.uploaded_photos and st.session_state.prop_type and not st.session_state.has_unsaved_changes
+
+        if st.button(get_text("btn_generate"), use_container_width=True, type="primary", disabled=not can_generate):
+            generate_ai_content()
+
+    if st.session_state.content_generated:
+        render_results()
+
+def generate_ai_content():
+    with st.spinner("Generating..."):
+        try:
+            images = [Image.open(f) for f in st.session_state.uploaded_photos]
+
+            prompt = f"""Create real estate marketing content for: {st.session_state.prop_type} in {st.session_state.location}
+Price: {st.session_state.price} | Strategy: {st.session_state.tone}
+
+Use EXACT headers:
+## PRIME_LISTING - Compelling sales copy (300 words)
+## SOCIAL_MEDIA_KIT - Instagram, Facebook, LinkedIn posts with hashtags
+## VIDEO_SCRIPT - 60-sec cinematic script with scenes and voiceover
+## TECHNICAL_SPECS - Professional specs and features list
+
+Language: {st.session_state.target_lang_input}"""
+
+            response = model.generate_content([prompt] + images)
+            text = response.text
+
+            sections = {"prime_listing": "", "social_media": "", "video_script": "", "technical_specs": ""}
+            if "## PRIME_LISTING" in text:
+                sections["prime_listing"] = text.split("## PRIME_LISTING")[1].split("##")[0].strip()
+            if "## SOCIAL_MEDIA_KIT" in text:
+                sections["social_media"] = text.split("## SOCIAL_MEDIA_KIT")[1].split("##")[0].strip()
+            if "## VIDEO_SCRIPT" in text:
+                sections["video_script"] = text.split("## VIDEO_SCRIPT")[1].split("##")[0].strip()
+            if "## TECHNICAL_SPECS" in text:
+                sections["technical_specs"] = text.split("## TECHNICAL_SPECS")[1].strip()
+
+            st.session_state.generated_sections = sections
+            st.session_state.content_generated = True
+            st.session_state.content_saved = False
+            st.session_state.has_unsaved_changes = False
+            st.session_state.credits_used_this_month += 1
+            st.rerun()
+        except Exception as e:
+            st.error(f"Error: {e}")
+
+def render_results():
+    st.markdown("---")
+
+    if st.session_state.has_unsaved_changes:
+        st.markdown("<div class='badge-warning'>Unsaved Changes - Save to preserve edits</div>", unsafe_allow_html=True)
+    elif st.session_state.content_saved:
+        st.markdown("<div class='badge-success'>All Changes Saved</div>", unsafe_allow_html=True)
+    else:
+        st.markdown("<div class='badge-info'>New Content Generated - Click Save to preserve</div>", unsafe_allow_html=True)
+
+    tabs = st.tabs([get_text("tab_prime"), get_text("tab_social"), get_text("tab_video"), get_text("tab_tech")])
+    keys = ["prime_listing", "social_media", "video_script", "technical_specs"]
+    edited = {}
+
+    for tab, key in zip(tabs, keys):
+        with tab:
+            original = st.session_state.generated_sections.get(key, "")
+            new_val = st.text_area("Content", value=original, height=300, key=f"edit_{key}", label_visibility="collapsed")
+            edited[key] = new_val
+            if new_val != original:
                 st.session_state.has_unsaved_changes = True
-        with tab2: 
-            res_sosyal = st.text_area(t["label_social"], value=sec2, height=400, key="txt_sosyal")
-            if res_sosyal != sec2:
-                st.session_state.has_unsaved_changes = True
-        with tab3: 
-            res_video = st.text_area(t["label_video"], value=sec3, height=400, key="txt_video")
-            if res_video != sec3:
-                st.session_state.has_unsaved_changes = True
-        with tab4: 
-            res_teknik = st.text_area(t["label_tech"], value=sec4, height=400, key="txt_teknik")
-            if res_teknik != sec4:
-                st.session_state.has_unsaved_changes = True
-          
-        c1, c2 = st.columns(2) 
-        with c1: 
-            if st.button(t["save_btn"]): 
-                st.session_state.uretilen_ilan = f"## SECTION_1\n{res_ana}\n\n## SECTION_2\n{res_sosyal}\n\n## SECTION_3\n{res_video}\n\n## SECTION_4\n{res_teknik}"
-                st.session_state.has_unsaved_changes = False
-                st.success(t["saved_msg"]) 
-        with c2: 
-            st.download_button(t["download"], data=st.session_state.uretilen_ilan, file_name="sarsa_ai_export.txt") 
-else: 
-    st.info(t["empty"])
+
+    if st.button(get_text("save_btn"), type="primary", use_container_width=True):
+        for key in keys:
+            st.session_state.generated_sections[key] = edited[key]
+        st.session_state.content_saved = True
+        st.session_state.has_unsaved_changes = False
+        save_to_db()
+        st.success(get_text("saved_msg"))
+        st.rerun()
+
+    st.markdown("---")
+    st.markdown("<h3>Export Options</h3>", unsafe_allow_html=True)
+
+    name = (st.session_state.property_name or "Property").replace(" ", "_")[:50]
+
+    cols = st.columns(5)
+    exports = [
+        (get_text("download_prime"), get_text("filename_prime").format(property_name=name), "prime_listing"),
+        (get_text("download_social"), get_text("filename_social").format(property_name=name), "social_media"),
+        (get_text("download_video"), get_text("filename_video").format(property_name=name), "video_script"),
+        (get_text("download_tech"), get_text("filename_tech").format(property_name=name), "technical_specs"),
+    ]
+
+    for col, (label, filename, key) in zip(cols[:4], exports):
+        with col:
+            content = st.session_state.generated_sections[key]
+            st.download_button(label, data=content, file_name=filename, mime="text/plain", use_container_width=True)
+
+    with cols[4]:
+        if st.button(get_text("download_all"), use_container_width=True):
+            zip_buffer = io.BytesIO()
+            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+                for filename, key in [(e[1], e[2]) for e in exports]:
+                    section_name = filename.split('_', 1)[1].replace('.txt', '').replace('_', ' ').upper()
+                    content = f"{section_name}\n{'='*50}\n\n{st.session_state.generated_sections[key]}"
+                    zf.writestr(filename, content)
+            zip_buffer.seek(0)
+            st.download_button("📥 Download ZIP", data=zip_buffer.getvalue(), file_name=get_text("filename_all").format(property_name=name), mime="application/zip", use_container_width=True)
+
+def save_to_db():
+    data = get_properties_data()
+    prop_id = st.session_state.current_property_id or f"prop_{int(time.time())}"
+
+    prop_data = {
+        "id": prop_id,
+        "user_email": st.session_state.user_email,
+        "name": st.session_state.property_name or "Untitled",
+        "property_type": st.session_state.prop_type,
+        "price": st.session_state.price,
+        "location": st.session_state.location,
+        "strategy": st.session_state.tone,
+        "target_language": st.session_state.target_lang_input,
+        "special_notes": st.session_state.custom_inst,
+        "sections": st.session_state.generated_sections,
+        "status": "draft",
+        "created_at": datetime.now().isoformat(),
+        "updated_at": datetime.now().isoformat()
+    }
+
+    existing = next((i for i, p in enumerate(data["properties"]) if p["id"] == prop_id), None)
+    if existing is not None:
+        data["properties"][existing] = prop_data
+    else:
+        data["properties"].append(prop_data)
+        st.session_state.current_property_id = prop_id
+
+    save_properties_data(data)
+
+# MAIN
+def main():
+    if not st.session_state.authenticated:
+        login_page()
+    else:
+        render_sidebar()
+        if st.session_state.current_view == "dashboard":
+            dashboard_view()
+        elif st.session_state.current_view == "editor":
+            editor_view()
+        elif st.session_state.current_view == "properties":
+            dashboard_view()
+
+if __name__ == "__main__":
+    main()
