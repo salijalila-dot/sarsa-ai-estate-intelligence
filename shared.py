@@ -1507,6 +1507,16 @@ Subject: [Urgent but professional subject]
 Write every word in {lang}. Be specific — reference real details from photos. Zero filler sentences."""
 
 
+@st.cache_data
+def load_logo(path: str):
+    try:
+        from PIL import Image
+        import os
+        return Image.open(path) if os.path.exists(path) else None
+    except Exception:
+        return None
+
+
 def render_sidebar(T: dict):
     """Renders the full sidebar. Call from any page."""
     with st.sidebar:
