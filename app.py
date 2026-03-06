@@ -2,13 +2,15 @@ import streamlit as st
 from PIL import Image
 import google.generativeai as genai
 import os
-import re
+import json
+import time
 from datetime import datetime
 
-# --- AI CONFIG ---
+# --- AI CONFIGURATION ---
 GOOGLE_API_KEY = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=GOOGLE_API_KEY)
-model = genai.GenerativeModel('gemini-2.5-flash')
+MODEL_NAME = 'gemini-2.5-flash'
+model = genai.GenerativeModel(MODEL_NAME)
 
 # --- PAGE CONFIG ---
 st.set_page_config(
@@ -18,1114 +20,1542 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- LOGO LOADER ---
 @st.cache_data
 def load_logo(file_path):
     if os.path.exists(file_path):
         return Image.open(file_path)
     return None
 
-# --- LANGUAGE SYSTEM ---
+# ─────────────────────────────────────────────
+# LANGUAGE SYSTEM
+# ─────────────────────────────────────────────
 ui_languages = {
     "English": {
         "title": "SarSa AI | Real Estate Intelligence Platform",
         "service_desc": "All-in-One Visual Property Intelligence & Global Sales Automation",
-        "subtitle": "Transform property photos into premium listings, social media kits, cinematic video scripts, email sequences, technical specs & SEO packs — instantly.",
-        "settings": "⚙️ Configuration",
+        "subtitle": "Transform property photos into premium listings, social media kits, cinematic video scripts, and technical data sheets instantly.",
+        "settings": "Configuration",
+        "interface_lang": "🌐 Interface Language",
         "target_lang": "✍️ Write Listing In...",
-        "prop_type": "Property Type", "price": "Market Price", "location": "Location",
-        "beds": "Bedrooms", "baths": "Bathrooms", "sqm": "Size (m²)",
-        "year": "Year Built", "parking": "Parking", "amenities": "Key Features",
-        "tone": "Strategy",
-        "tones": ["Standard Pro", "Ultra-Luxury", "Investment Potential", "Modern Minimalist", "Family Comfort", "Vacation Rental", "New Development", "Commercial"],
-        "custom_inst": "📝 Special Notes",
-        "agent_section": "👤 Agent Profile",
-        "agent_name": "Your Name", "agent_co": "Agency / Company",
-        "agent_phone": "Phone", "agent_email": "Email",
-        "ph_prop": "E.g., 3+1 Apartment, Luxury Villa...",
-        "ph_price": "E.g., $500,000 or £2,000/mo...",
-        "ph_loc": "E.g., Manhattan, NY or London, UK...",
-        "ph_beds": "e.g. 3", "ph_baths": "e.g. 2", "ph_sqm": "e.g. 150",
-        "ph_year": "e.g. 2020", "ph_park": "e.g. 1 garage",
-        "ph_amen": "e.g. Pool, gym, sea view",
-        "custom_inst_ph": "E.g., High ceilings, near metro...",
-        "ph_an": "e.g. Sarah Johnson", "ph_ac": "e.g. Luxe Realty Group",
-        "ph_ap": "e.g. +1 305 000 0000", "ph_ae": "e.g. sarah@luxerealty.com",
-        "btn": "🚀 GENERATE COMPLETE MARKETING PACKAGE",
+        "prop_type": "Property Type",
+        "price": "Market Price",
+        "location": "Location",
+        "tone": "Marketing Strategy",
+        "bedrooms": "Bedrooms",
+        "bathrooms": "Bathrooms",
+        "area": "Area (sqm / sqft)",
+        "year_built": "Year Built",
+        "furnishing": "Furnishing",
+        "furnishing_opts": ["Not Specified", "Fully Furnished", "Semi-Furnished", "Unfurnished"],
+        "target_audience": "Target Audience",
+        "audience_opts": ["General Market", "Luxury Buyers", "Investors", "Expats & Internationals", "First-Time Buyers", "Vacation / Holiday Market"],
+        "tones": ["Standard Pro", "Ultra-Luxury", "Investment Focus", "Modern Minimalist", "Family Living", "Vacation Rental"],
+        "ph_prop": "E.g., 3-Bed Luxury Villa, Studio Apartment...",
+        "ph_price": "E.g., $850,000 or €2,500/month...",
+        "ph_loc": "E.g., Dubai Marina, Bali, Manhattan...",
+        "ph_beds": "E.g., 3",
+        "ph_baths": "E.g., 2",
+        "ph_area": "E.g., 185",
+        "ph_year": "E.g., 2023",
+        "custom_inst": "📝 Special Notes & Highlights",
+        "custom_inst_ph": "E.g., Private pool, panoramic sea view, smart home system, near international school...",
+        "btn": "✨ GENERATE COMPLETE MARKETING ASSETS",
         "upload_label": "📸 Drop Property Photos Here",
-        "result": "💎 Your Marketing Package",
-        "loading": "Crafting your premium marketing package...",
-        "empty": "Awaiting visuals to start professional analysis.",
-        "download": "📥 Export Full Package",
-        "dl_section": "📥 Download",
-        "save_btn": "💾 Save to History",
-        "saved_msg": "✅ Saved to history!",
+        "upload_hint": "JPG, PNG, WEBP, JPEG · Up to 200MB per file",
+        "result": "💎 Executive Preview",
+        "loading": "Crafting your premium marketing ecosystem...",
+        "empty_title": "Ready to Transform Your Listing",
+        "empty_sub": "Upload property photos and fill in the details on the left to generate complete marketing assets.",
+        "download_all": "📥 Export All (TXT)",
+        "download_tab": "📥 Export This Section",
+        "copy_btn": "📋 Copy",
+        "save_btn": "💾 Save Changes",
+        "saved_msg": "✅ Changes saved!",
         "error": "Error:",
-        "nav_gen": "🏠 Generate", "nav_tools": "⚡ Agent Tools", "nav_hist": "📁 History",
-        "tab1": "📝 Prime Listing", "tab2": "📱 Social Media Kit",
-        "tab3": "🎬 Video Script", "tab4": "⚙️ Technical Specs",
-        "tab5": "📧 Email Templates", "tab6": "🔍 SEO Pack",
-        "lbl1": "Sales Copy", "lbl2": "Social Media Content",
-        "lbl3": "Video Script", "lbl4": "Technical Specifications",
-        "lbl5": "Email Templates", "lbl6": "SEO & Digital Pack",
-        "words": "words", "chars": "chars",
-        "fh_ok": "✅ Fair housing check — no issues",
-        "fh_warn": "⚠️ Review flagged terms: ",
-        "copy_btn": "📋 Copy", "copied": "✅ Copied!",
-        "regen": "🔄 Regenerate",
-        "tools_title": "⚡ AI Agent Power Tools",
-        "tools_sub": "Professional tools for real estate agents — one click, instant results.",
-        "tool_run": "▶ Generate", "tool_clear": "✕ Clear",
-        "hist_title": "📁 Saved Listings",
-        "hist_empty": "No saved listings yet. Generate and save your first one.",
-        "hist_load": "Load", "hist_del": "Delete", "hist_dl": "Download",
+        "tab_main": "Prime Listing",
+        "tab_social": "Social Media Kit",
+        "tab_video": "Video Scripts",
+        "tab_tech": "Technical Specs",
+        "tab_email": "Email Campaign",
+        "tab_seo": "SEO & Web Copy",
+        "label_main": "Sales Copy",
+        "label_social": "Social Media Content",
+        "label_video": "Video Script",
+        "label_tech": "Technical Specifications",
+        "label_email": "Email Campaign",
+        "label_seo": "SEO & Web Copy",
+        "photos_uploaded": "photos uploaded",
+        "generating": "Generating...",
+        "features": ["Prime Listing", "Social Media Kit", "Cinematic Script", "Tech Specs", "Email Campaign", "SEO Copy"],
+        "pro_tip": "💡 Pro Tip",
+        "pro_tip_text": "Upload 3–6 photos including exterior, interior, and key features for best results.",
+        "clear_btn": "🗑️ Clear All",
+        "history_title": "Recent Generations",
+        "no_history": "No previous generations this session.",
     },
     "Türkçe": {
         "title": "SarSa AI | Gayrimenkul Zeka Platformu",
         "service_desc": "Hepsi Bir Arada Görsel Mülk Zekası ve Küresel Satış Otomasyonu",
-        "subtitle": "Mülk fotoğraflarını anında profesyonel ilanlara, sosyal medya kitlerine, video senaryolarına, e-posta şablonlarına ve SEO paketine dönüştürün.",
-        "settings": "⚙️ Yapılandırma",
-        "target_lang": "✍️ İlan Yazım Dili...",
-        "prop_type": "Emlak Tipi", "price": "Pazar Fiyatı", "location": "Konum",
-        "beds": "Yatak Odası", "baths": "Banyo", "sqm": "Alan (m²)",
-        "year": "Yapım Yılı", "parking": "Otopark", "amenities": "Özellikler",
-        "tone": "Strateji",
-        "tones": ["Standart Pro", "Ultra-Lüks", "Yatırım Potansiyeli", "Modern Minimalist", "Aile Konforu", "Tatil Kiralaması", "Yeni Proje", "Ticari"],
-        "custom_inst": "📝 Özel Notlar",
-        "agent_section": "👤 Temsilci Profili",
-        "agent_name": "Adınız", "agent_co": "Acente / Şirket",
-        "agent_phone": "Telefon", "agent_email": "E-posta",
-        "ph_prop": "Örn: 3+1 Daire, Müstakil Villa...",
+        "subtitle": "Mülk fotoğraflarını anında profesyonel ilanlara, sosyal medya kitlerine, sinematik video senaryolarına ve teknik şartnamelere dönüştürün.",
+        "settings": "Yapılandırma",
+        "interface_lang": "🌐 Arayüz Dili",
+        "target_lang": "✍️ İlan Dili...",
+        "prop_type": "Emlak Tipi",
+        "price": "Pazar Fiyatı",
+        "location": "Konum",
+        "tone": "Pazarlama Stratejisi",
+        "bedrooms": "Yatak Odası",
+        "bathrooms": "Banyo",
+        "area": "Alan (m²)",
+        "year_built": "İnşaat Yılı",
+        "furnishing": "Eşya Durumu",
+        "furnishing_opts": ["Belirtilmedi", "Tam Eşyalı", "Yarı Eşyalı", "Eşyasız"],
+        "target_audience": "Hedef Kitle",
+        "audience_opts": ["Genel Pazar", "Lüks Alıcılar", "Yatırımcılar", "Yabancılar & Uluslararası", "İlk Ev Alıcıları", "Tatil / Kiralık Pazar"],
+        "tones": ["Standart Profesyonel", "Ultra-Lüks", "Yatırım Odaklı", "Modern Minimalist", "Aile Yaşamı", "Tatil Kiralık"],
+        "ph_prop": "Örn: 3+1 Lüks Villa, Stüdyo Daire...",
         "ph_price": "Örn: 5.000.000 TL veya $2.500/ay...",
         "ph_loc": "Örn: Beşiktaş, İstanbul...",
-        "ph_beds": "örn. 3", "ph_baths": "örn. 2", "ph_sqm": "örn. 150",
-        "ph_year": "örn. 2020", "ph_park": "örn. 1 kapalı garaj",
-        "ph_amen": "örn. Havuz, spor salonu, deniz manzarası",
-        "custom_inst_ph": "Örn: Yüksek tavanlar, metroya yakın...",
-        "ph_an": "örn. Ayşe Kaya", "ph_ac": "örn. Lüks Emlak A.Ş.",
-        "ph_ap": "örn. +90 532 000 0000", "ph_ae": "örn. ayse@luksemalik.com",
-        "btn": "🚀 TAM PAZARLAMA PAKETİ OLUŞTUR",
+        "ph_beds": "Örn: 3",
+        "ph_baths": "Örn: 2",
+        "ph_area": "Örn: 185",
+        "ph_year": "Örn: 2023",
+        "custom_inst": "📝 Özel Notlar ve Öne Çıkan Özellikler",
+        "custom_inst_ph": "Örn: Özel havuz, panoramik manzara, akıllı ev sistemi...",
+        "btn": "✨ TÜM PAZARLAMA VARLIKLARINI OLUŞTUR",
         "upload_label": "📸 Fotoğrafları Buraya Bırakın",
-        "result": "💎 Pazarlama Paketiniz",
-        "loading": "Premium pazarlama paketiniz hazırlanıyor...",
-        "empty": "Profesyonel analiz için görsel bekleniyor.",
-        "download": "📥 Tam Paketi İndir",
-        "dl_section": "📥 İndir",
-        "save_btn": "💾 Geçmişe Kaydet",
-        "saved_msg": "✅ Geçmişe kaydedildi!",
+        "upload_hint": "JPG, PNG, WEBP, JPEG · Dosya başına 200MB'a kadar",
+        "result": "💎 Yönetici Önizlemesi",
+        "loading": "Premium pazarlama ekosisteminiz hazırlanıyor...",
+        "empty_title": "İlanınızı Dönüştürmeye Hazır",
+        "empty_sub": "Fotoğraf yükleyin ve soldaki bilgileri doldurun.",
+        "download_all": "📥 Tümünü Dışa Aktar (TXT)",
+        "download_tab": "📥 Bu Bölümü Dışa Aktar",
+        "copy_btn": "📋 Kopyala",
+        "save_btn": "💾 Değişiklikleri Kaydet",
+        "saved_msg": "✅ Kaydedildi!",
         "error": "Hata:",
-        "nav_gen": "🏠 Oluştur", "nav_tools": "⚡ Araçlar", "nav_hist": "📁 Geçmiş",
-        "tab1": "📝 Ana İlan", "tab2": "📱 Sosyal Medya",
-        "tab3": "🎬 Video Senaryosu", "tab4": "⚙️ Teknik Özellikler",
-        "tab5": "📧 E-postalar", "tab6": "🔍 SEO Paketi",
-        "lbl1": "Satış Metni", "lbl2": "Sosyal Medya İçeriği",
-        "lbl3": "Video Senaryosu", "lbl4": "Teknik Özellikler",
-        "lbl5": "E-posta Şablonları", "lbl6": "SEO & Dijital Paket",
-        "words": "kelime", "chars": "karakter",
-        "fh_ok": "✅ Adil konut kontrolü — sorun yok",
-        "fh_warn": "⚠️ İşaretlenen terimleri inceleyin: ",
-        "copy_btn": "📋 Kopyala", "copied": "✅ Kopyalandı!",
-        "regen": "🔄 Yeniden Oluştur",
-        "tools_title": "⚡ AI Ajan Güç Araçları",
-        "tools_sub": "Emlak profesyonelleri için araçlar — tek tıkla anında sonuç.",
-        "tool_run": "▶ Oluştur", "tool_clear": "✕ Temizle",
-        "hist_title": "📁 Kayıtlı İlanlar",
-        "hist_empty": "Henüz kayıtlı ilan yok.",
-        "hist_load": "Yükle", "hist_del": "Sil", "hist_dl": "İndir",
+        "tab_main": "Ana İlan",
+        "tab_social": "Sosyal Medya Kiti",
+        "tab_video": "Video Senaryoları",
+        "tab_tech": "Teknik Özellikler",
+        "tab_email": "E-posta Kampanyası",
+        "tab_seo": "SEO & Web Metni",
+        "label_main": "Satış Metni",
+        "label_social": "Sosyal Medya",
+        "label_video": "Video Script",
+        "label_tech": "Teknik Detaylar",
+        "label_email": "E-posta",
+        "label_seo": "SEO Metni",
+        "photos_uploaded": "fotoğraf yüklendi",
+        "generating": "Oluşturuluyor...",
+        "features": ["Ana İlan", "Sosyal Medya", "Sinematik Script", "Teknik Özellikler", "E-posta", "SEO"],
+        "pro_tip": "💡 Pro İpucu",
+        "pro_tip_text": "En iyi sonuç için dış mekan, iç mekan ve önemli özellikleri içeren 3-6 fotoğraf yükleyin.",
+        "clear_btn": "🗑️ Temizle",
+        "history_title": "Son Üretimler",
+        "no_history": "Bu oturumda üretim yok.",
     },
     "Español": {
-        "title": "SarSa AI | Motor de Inteligencia Inmobiliaria",
+        "title": "SarSa AI | Plataforma de Inteligencia Inmobiliaria",
         "service_desc": "Inteligencia Visual de Propiedades y Automatización de Ventas Globales",
-        "subtitle": "Convierte fotos en anuncios premium, kits de redes, guiones de video, emails y SEO al instante.",
-        "settings": "⚙️ Configuración",
-        "target_lang": "✍️ Escribir en...",
-        "prop_type": "Tipo de Propiedad", "price": "Precio de Mercado", "location": "Ubicación",
-        "beds": "Habitaciones", "baths": "Baños", "sqm": "Superficie (m²)",
-        "year": "Año", "parking": "Garaje", "amenities": "Características",
-        "tone": "Estrategia",
-        "tones": ["Profesional Estándar", "Ultra-Lujo", "Potencial de Inversión", "Minimalista Moderno", "Confort Familiar", "Alquiler Vacacional", "Nueva Construcción", "Comercial"],
-        "custom_inst": "📝 Notas Especiales",
-        "agent_section": "👤 Perfil del Agente",
-        "agent_name": "Tu Nombre", "agent_co": "Agencia / Empresa",
-        "agent_phone": "Teléfono", "agent_email": "Email",
-        "ph_prop": "Ej: Apartamento 3+1, Villa de Lujo...",
-        "ph_price": "Ej: $500.000 o €1.500/mes...",
-        "ph_loc": "Ej: Madrid, España...",
-        "ph_beds": "ej. 3", "ph_baths": "ej. 2", "ph_sqm": "ej. 150",
-        "ph_year": "ej. 2020", "ph_park": "ej. 1 garaje",
-        "ph_amen": "ej. Piscina, gimnasio, vistas al mar",
-        "custom_inst_ph": "Ej: Techos altos, cerca del metro...",
-        "ph_an": "ej. Carlos García", "ph_ac": "ej. Luxe Realty Group",
-        "ph_ap": "ej. +34 600 000 000", "ph_ae": "ej. carlos@luxerealty.es",
-        "btn": "🚀 GENERAR PAQUETE DE MARKETING COMPLETO",
-        "upload_label": "📸 Subir Fotos Aquí",
-        "result": "💎 Tu Paquete de Marketing",
-        "loading": "Creando tu paquete de marketing premium...",
-        "empty": "Esperando imágenes para análisis profesional.",
-        "download": "📥 Exportar Paquete Completo",
-        "dl_section": "📥 Descargar",
-        "save_btn": "💾 Guardar en Historial",
+        "subtitle": "Convierta fotos en anuncios premium, kits de redes sociales, guiones de video y fichas técnicas al instante.",
+        "settings": "Configuración",
+        "interface_lang": "🌐 Idioma de Interfaz",
+        "target_lang": "✍️ Escribir Anuncio En...",
+        "prop_type": "Tipo de Propiedad",
+        "price": "Precio de Mercado",
+        "location": "Ubicación",
+        "tone": "Estrategia de Marketing",
+        "bedrooms": "Dormitorios",
+        "bathrooms": "Baños",
+        "area": "Área (m²)",
+        "year_built": "Año de Construcción",
+        "furnishing": "Amueblado",
+        "furnishing_opts": ["No especificado", "Completamente Amueblado", "Semi-Amueblado", "Sin Amueblar"],
+        "target_audience": "Público Objetivo",
+        "audience_opts": ["Mercado General", "Compradores de Lujo", "Inversores", "Extranjeros e Internacionales", "Primeros Compradores", "Mercado Vacacional"],
+        "tones": ["Profesional Estándar", "Ultra-Lujo", "Enfoque de Inversión", "Minimalista Moderno", "Vida Familiar", "Alquiler Vacacional"],
+        "ph_prop": "Ej: Villa 3 Hab., Apartamento Estudio...",
+        "ph_price": "Ej: $850,000 o €2,500/mes...",
+        "ph_loc": "Ej: Madrid, Marbella, Miami...",
+        "ph_beds": "Ej: 3",
+        "ph_baths": "Ej: 2",
+        "ph_area": "Ej: 185",
+        "ph_year": "Ej: 2023",
+        "custom_inst": "📝 Notas Especiales y Características",
+        "custom_inst_ph": "Ej: Piscina privada, vistas al mar, domótica...",
+        "btn": "✨ GENERAR ACTIVOS DE MARKETING COMPLETOS",
+        "upload_label": "📸 Subir Fotos de la Propiedad",
+        "upload_hint": "JPG, PNG, WEBP, JPEG · Hasta 200MB por archivo",
+        "result": "💎 Vista Previa Ejecutiva",
+        "loading": "Creando su ecosistema de marketing premium...",
+        "empty_title": "Listo para Transformar su Anuncio",
+        "empty_sub": "Suba fotos y complete los detalles a la izquierda.",
+        "download_all": "📥 Exportar Todo (TXT)",
+        "download_tab": "📥 Exportar Esta Sección",
+        "copy_btn": "📋 Copiar",
+        "save_btn": "💾 Guardar Cambios",
         "saved_msg": "✅ ¡Guardado!",
         "error": "Error:",
-        "nav_gen": "🏠 Generar", "nav_tools": "⚡ Herramientas", "nav_hist": "📁 Historial",
-        "tab1": "📝 Anuncio Premium", "tab2": "📱 Kit de Redes",
-        "tab3": "🎬 Guión de Vídeo", "tab4": "⚙️ Especificaciones",
-        "tab5": "📧 Emails", "tab6": "🔍 SEO",
-        "lbl1": "Texto de Ventas", "lbl2": "Contenido Social",
-        "lbl3": "Guión de Vídeo", "lbl4": "Ficha Técnica",
-        "lbl5": "Plantillas de Email", "lbl6": "Pack SEO & Digital",
-        "words": "palabras", "chars": "caracteres",
-        "fh_ok": "✅ Vivienda justa — sin problemas",
-        "fh_warn": "⚠️ Revisar términos: ",
-        "copy_btn": "📋 Copiar", "copied": "✅ ¡Copiado!",
-        "regen": "🔄 Regenerar",
-        "tools_title": "⚡ Herramientas IA para Agentes",
-        "tools_sub": "Herramientas profesionales — un clic, resultados instantáneos.",
-        "tool_run": "▶ Generar", "tool_clear": "✕ Limpiar",
-        "hist_title": "📁 Listados Guardados",
-        "hist_empty": "Aún no hay listados guardados.",
-        "hist_load": "Cargar", "hist_del": "Eliminar", "hist_dl": "Descargar",
+        "tab_main": "Anuncio Premium",
+        "tab_social": "Kit de Redes Sociales",
+        "tab_video": "Guiones de Video",
+        "tab_tech": "Especificaciones",
+        "tab_email": "Campaña de Email",
+        "tab_seo": "SEO & Web Copy",
+        "label_main": "Texto de Ventas",
+        "label_social": "Contenido Social",
+        "label_video": "Guion de Video",
+        "label_tech": "Ficha Técnica",
+        "label_email": "Campaña Email",
+        "label_seo": "Texto SEO",
+        "photos_uploaded": "fotos subidas",
+        "generating": "Generando...",
+        "features": ["Anuncio Premium", "Redes Sociales", "Script Cinematico", "Especificaciones", "Email", "SEO"],
+        "pro_tip": "💡 Consejo Pro",
+        "pro_tip_text": "Sube 3-6 fotos incluyendo exterior, interior y características principales para mejores resultados.",
+        "clear_btn": "🗑️ Limpiar Todo",
+        "history_title": "Generaciones Recientes",
+        "no_history": "Sin generaciones previas esta sesión.",
     },
     "Deutsch": {
         "title": "SarSa AI | Immobilien-Intelligenz-Plattform",
         "service_desc": "All-in-One Visuelle Objektintelligenz & Globale Verkaufsautomatisierung",
-        "subtitle": "Verwandeln Sie Fotos sofort in Premium-Exposés, Social-Media-Kits, Videoskripte, E-Mails und SEO-Pakete.",
-        "settings": "⚙️ Konfiguration",
-        "target_lang": "✍️ Erstellen in...",
-        "prop_type": "Objekttyp", "price": "Marktpreis", "location": "Standort",
-        "beds": "Zimmer", "baths": "Bad", "sqm": "Fläche (m²)",
-        "year": "Baujahr", "parking": "Stellplatz", "amenities": "Merkmale",
-        "tone": "Strategie",
-        "tones": ["Standard-Profi", "Ultra-Luxus", "Investitionspotenzial", "Modern-Minimalistisch", "Familienkomfort", "Ferienmiete", "Neubau", "Gewerbe"],
-        "custom_inst": "📝 Notizen",
-        "agent_section": "👤 Makler-Profil",
-        "agent_name": "Ihr Name", "agent_co": "Agentur / Firma",
-        "agent_phone": "Telefon", "agent_email": "E-Mail",
+        "subtitle": "Verwandeln Sie Fotos sofort in Premium-Exposés, Social-Media-Kits, Videoskripte und Datenblätter.",
+        "settings": "Konfiguration",
+        "interface_lang": "🌐 Oberflächensprache",
+        "target_lang": "✍️ Exposé-Sprache...",
+        "prop_type": "Objekttyp",
+        "price": "Marktpreis",
+        "location": "Standort",
+        "tone": "Marketingstrategie",
+        "bedrooms": "Schlafzimmer",
+        "bathrooms": "Badezimmer",
+        "area": "Fläche (m²)",
+        "year_built": "Baujahr",
+        "furnishing": "Möblierung",
+        "furnishing_opts": ["Nicht angegeben", "Vollmöbliert", "Teilmöbliert", "Unmöbliert"],
+        "target_audience": "Zielgruppe",
+        "audience_opts": ["Allgemeiner Markt", "Luxuskäufer", "Investoren", "Expats & Internationale", "Erstkäufer", "Ferienmarkt"],
+        "tones": ["Standard-Profi", "Ultra-Luxus", "Investitionsfokus", "Modern-Minimalistisch", "Familienleben", "Ferienmiete"],
         "ph_prop": "Z.B. 3-Zimmer-Wohnung, Luxusvilla...",
-        "ph_price": "Z.B. 500.000€ oder 2.000€/Monat...",
-        "ph_loc": "Z.B. Berlin, Deutschland...",
-        "ph_beds": "z.B. 3", "ph_baths": "z.B. 2", "ph_sqm": "z.B. 150",
-        "ph_year": "z.B. 2020", "ph_park": "z.B. 1 Tiefgarage",
-        "ph_amen": "z.B. Pool, Gym, Meerblick",
-        "custom_inst_ph": "Z.B. Hohe Decken, U-Bahn-Nähe...",
-        "ph_an": "z.B. Thomas Müller", "ph_ac": "z.B. Luxe Realty GmbH",
-        "ph_ap": "z.B. +49 89 000 0000", "ph_ae": "z.B. thomas@luxerealty.de",
-        "btn": "🚀 KOMPLETTES MARKETING-PAKET ERSTELLEN",
+        "ph_price": "Z.B. 850.000€ oder 2.500€/Monat...",
+        "ph_loc": "Z.B. Berlin, München, Hamburg...",
+        "ph_beds": "Z.B. 3",
+        "ph_baths": "Z.B. 2",
+        "ph_area": "Z.B. 185",
+        "ph_year": "Z.B. 2023",
+        "custom_inst": "📝 Notizen & Besonderheiten",
+        "custom_inst_ph": "Z.B. Privatpool, Panoramasicht, Smart-Home...",
+        "btn": "✨ KOMPLETTE MARKETING-ASSETS ERSTELLEN",
         "upload_label": "📸 Fotos hier hochladen",
-        "result": "💎 Ihr Marketing-Paket",
-        "loading": "Ihr Marketing-Paket wird erstellt...",
-        "empty": "Warte auf Bilder für die Analyse.",
-        "download": "📥 Gesamtpaket exportieren",
-        "dl_section": "📥 Herunterladen",
-        "save_btn": "💾 Im Verlauf speichern",
+        "upload_hint": "JPG, PNG, WEBP, JPEG · Bis 200MB pro Datei",
+        "result": "💎 Executive-Vorschau",
+        "loading": "Ihr Marketing-Ökosystem wird erstellt...",
+        "empty_title": "Bereit zur Transformation",
+        "empty_sub": "Laden Sie Fotos hoch und füllen Sie die Details aus.",
+        "download_all": "📥 Alles Exportieren (TXT)",
+        "download_tab": "📥 Diesen Abschnitt Exportieren",
+        "copy_btn": "📋 Kopieren",
+        "save_btn": "💾 Änderungen Speichern",
         "saved_msg": "✅ Gespeichert!",
         "error": "Fehler:",
-        "nav_gen": "🏠 Erstellen", "nav_tools": "⚡ Makler-Tools", "nav_hist": "📁 Verlauf",
-        "tab1": "📝 Premium-Exposé", "tab2": "📱 Social Media Kit",
-        "tab3": "🎬 Videoskripte", "tab4": "⚙️ Tech-Details",
-        "tab5": "📧 E-Mails", "tab6": "🔍 SEO-Paket",
-        "lbl1": "Verkaufstext", "lbl2": "Social Media Content",
-        "lbl3": "Video-Skript", "lbl4": "Technische Daten",
-        "lbl5": "E-Mail-Vorlagen", "lbl6": "SEO & Digital-Paket",
-        "words": "Wörter", "chars": "Zeichen",
-        "fh_ok": "✅ Fairness-Check — keine Probleme",
-        "fh_warn": "⚠️ Prüfen: ",
-        "copy_btn": "📋 Kopieren", "copied": "✅ Kopiert!",
-        "regen": "🔄 Neu erstellen",
-        "tools_title": "⚡ KI-Tools für Makler",
-        "tools_sub": "Professionelle Tools — ein Klick, sofortige Ergebnisse.",
-        "tool_run": "▶ Erstellen", "tool_clear": "✕ Löschen",
-        "hist_title": "📁 Gespeicherte Objekte",
-        "hist_empty": "Noch keine gespeicherten Objekte.",
-        "hist_load": "Laden", "hist_del": "Löschen", "hist_dl": "Herunterladen",
+        "tab_main": "Premium-Exposé",
+        "tab_social": "Social-Media-Kit",
+        "tab_video": "Videoskripte",
+        "tab_tech": "Tech-Details",
+        "tab_email": "E-Mail-Kampagne",
+        "tab_seo": "SEO & Webtext",
+        "label_main": "Verkaufstext",
+        "label_social": "Social-Media-Content",
+        "label_video": "Videoskript",
+        "label_tech": "Technische Daten",
+        "label_email": "E-Mail-Kampagne",
+        "label_seo": "SEO-Text",
+        "photos_uploaded": "Fotos hochgeladen",
+        "generating": "Wird erstellt...",
+        "features": ["Premium-Exposé", "Social Media", "Kino-Skript", "Tech-Details", "E-Mail", "SEO"],
+        "pro_tip": "💡 Profi-Tipp",
+        "pro_tip_text": "Laden Sie 3-6 Fotos mit Außenansicht, Innenräumen und Besonderheiten für beste Ergebnisse hoch.",
+        "clear_btn": "🗑️ Alles Löschen",
+        "history_title": "Letzte Erstellungen",
+        "no_history": "Keine Erstellungen in dieser Sitzung.",
     },
     "Français": {
         "title": "SarSa AI | Plateforme d'Intelligence Immobilière",
         "service_desc": "Intelligence Visuelle Immobilière et Automatisation des Ventes Globales",
-        "subtitle": "Transformez vos photos en annonces premium, kits réseaux sociaux, scripts vidéo, emails et SEO instantanément.",
-        "settings": "⚙️ Configuration",
+        "subtitle": "Transformez vos photos en annonces premium, kits réseaux sociaux, scripts vidéo et fiches techniques instantanément.",
+        "settings": "Configuration",
+        "interface_lang": "🌐 Langue de l'Interface",
         "target_lang": "✍️ Rédiger en...",
-        "prop_type": "Type de Bien", "price": "Prix du Marché", "location": "Localisation",
-        "beds": "Chambres", "baths": "SDB", "sqm": "Surface (m²)",
-        "year": "Année", "parking": "Parking", "amenities": "Équipements",
-        "tone": "Stratégie",
-        "tones": ["Standard Pro", "Ultra-Luxe", "Potentiel d'Investissement", "Minimaliste Moderne", "Confort Familial", "Location Vacances", "Neuf", "Commercial"],
-        "custom_inst": "📝 Notes Spéciales",
-        "agent_section": "👤 Profil Agent",
-        "agent_name": "Votre Nom", "agent_co": "Agence / Société",
-        "agent_phone": "Téléphone", "agent_email": "Email",
-        "ph_prop": "Ex: Appartement T4, Villa de Luxe...",
-        "ph_price": "Ex: 500.000€ ou 1.500€/mois...",
-        "ph_loc": "Ex: Paris, France...",
-        "ph_beds": "ex. 3", "ph_baths": "ex. 2", "ph_sqm": "ex. 150",
-        "ph_year": "ex. 2020", "ph_park": "ex. 1 garage",
-        "ph_amen": "ex. Piscine, sport, vue mer",
-        "custom_inst_ph": "Ex: Plafonds hauts, proche métro...",
-        "ph_an": "ex. Marie Dupont", "ph_ac": "ex. Luxe Realty France",
-        "ph_ap": "ex. +33 6 00 00 00 00", "ph_ae": "ex. marie@luxerealty.fr",
-        "btn": "🚀 GÉNÉRER LE PACK MARKETING COMPLET",
+        "prop_type": "Type de Bien",
+        "price": "Prix du Marché",
+        "location": "Localisation",
+        "tone": "Stratégie Marketing",
+        "bedrooms": "Chambres",
+        "bathrooms": "Salles de Bain",
+        "area": "Surface (m²)",
+        "year_built": "Année de Construction",
+        "furnishing": "Ameublement",
+        "furnishing_opts": ["Non spécifié", "Entièrement Meublé", "Semi-Meublé", "Non Meublé"],
+        "target_audience": "Audience Cible",
+        "audience_opts": ["Marché Général", "Acheteurs de Luxe", "Investisseurs", "Expatriés & Internationaux", "Primo-Accédants", "Marché Vacances"],
+        "tones": ["Standard Pro", "Ultra-Luxe", "Focus Investissement", "Minimaliste Moderne", "Vie de Famille", "Location Saisonnière"],
+        "ph_prop": "Ex: Villa 3 Ch., Appartement Studio...",
+        "ph_price": "Ex: 850.000€ ou 2.500€/mois...",
+        "ph_loc": "Ex: Paris, Côte d'Azur, Monaco...",
+        "ph_beds": "Ex: 3",
+        "ph_baths": "Ex: 2",
+        "ph_area": "Ex: 185",
+        "ph_year": "Ex: 2023",
+        "custom_inst": "📝 Notes Spéciales & Points Forts",
+        "custom_inst_ph": "Ex: Piscine privée, vue panoramique, domotique...",
+        "btn": "✨ GÉNÉRER LES ACTIFS MARKETING COMPLETS",
         "upload_label": "📸 Déposer les Photos Ici",
-        "result": "💎 Votre Pack Marketing",
-        "loading": "Préparation de votre pack marketing premium...",
-        "empty": "En attente d'images pour analyse.",
-        "download": "📥 Exporter le Pack Complet",
-        "dl_section": "📥 Télécharger",
-        "save_btn": "💾 Sauvegarder",
-        "saved_msg": "✅ Sauvegardé !",
+        "upload_hint": "JPG, PNG, WEBP, JPEG · Jusqu'à 200MB par fichier",
+        "result": "💎 Aperçu Exécutif",
+        "loading": "Préparation de votre écosystème marketing premium...",
+        "empty_title": "Prêt à Transformer Votre Annonce",
+        "empty_sub": "Téléchargez des photos et remplissez les détails à gauche.",
+        "download_all": "📥 Exporter Tout (TXT)",
+        "download_tab": "📥 Exporter Cette Section",
+        "copy_btn": "📋 Copier",
+        "save_btn": "💾 Enregistrer",
+        "saved_msg": "✅ Enregistré !",
         "error": "Erreur :",
-        "nav_gen": "🏠 Générer", "nav_tools": "⚡ Outils Agent", "nav_hist": "📁 Historique",
-        "tab1": "📝 Annonce Premium", "tab2": "📱 Kit Réseaux Sociaux",
-        "tab3": "🎬 Scripts Vidéo", "tab4": "⚙️ Spécifications",
-        "tab5": "📧 Emails", "tab6": "🔍 SEO",
-        "lbl1": "Texte de Vente", "lbl2": "Contenu Social",
-        "lbl3": "Script Vidéo", "lbl4": "Détails Techniques",
-        "lbl5": "Templates Email", "lbl6": "Pack SEO & Digital",
-        "words": "mots", "chars": "caractères",
-        "fh_ok": "✅ Logement équitable — OK",
-        "fh_warn": "⚠️ Vérifier: ",
-        "copy_btn": "📋 Copier", "copied": "✅ Copié !",
-        "regen": "🔄 Régénérer",
-        "tools_title": "⚡ Outils IA pour Agents",
-        "tools_sub": "Outils professionnels — un clic, résultats instantanés.",
-        "tool_run": "▶ Générer", "tool_clear": "✕ Effacer",
-        "hist_title": "📁 Biens Sauvegardés",
-        "hist_empty": "Aucun bien sauvegardé.",
-        "hist_load": "Charger", "hist_del": "Supprimer", "hist_dl": "Télécharger",
+        "tab_main": "Annonce Premium",
+        "tab_social": "Kit Réseaux Sociaux",
+        "tab_video": "Scripts Vidéo",
+        "tab_tech": "Spécifications",
+        "tab_email": "Campagne Email",
+        "tab_seo": "SEO & Web Copy",
+        "label_main": "Texte de Vente",
+        "label_social": "Contenu Social",
+        "label_video": "Script Vidéo",
+        "label_tech": "Détails Techniques",
+        "label_email": "Campagne Email",
+        "label_seo": "Texte SEO",
+        "photos_uploaded": "photos téléchargées",
+        "generating": "Génération en cours...",
+        "features": ["Annonce Premium", "Réseaux Sociaux", "Script Cinéma", "Spécifications", "Email", "SEO"],
+        "pro_tip": "💡 Conseil Pro",
+        "pro_tip_text": "Téléchargez 3 à 6 photos incluant l'extérieur, l'intérieur et les atouts pour de meilleurs résultats.",
+        "clear_btn": "🗑️ Tout Effacer",
+        "history_title": "Générations Récentes",
+        "no_history": "Aucune génération dans cette session.",
     },
     "Português": {
-        "title": "SarSa AI | Motor de Inteligência Imobiliária",
+        "title": "SarSa AI | Plataforma de Inteligência Imobiliária",
         "service_desc": "Inteligência Visual Imobiliária e Automação de Vendas Globais",
-        "subtitle": "Transforme fotos em anúncios premium, kits de redes sociais, roteiros de vídeo, emails e SEO instantaneamente.",
-        "settings": "⚙️ Configuração",
-        "target_lang": "✍️ Escrever em...",
-        "prop_type": "Tipo de Imóvel", "price": "Preço de Mercado", "location": "Localização",
-        "beds": "Quartos", "baths": "WC", "sqm": "Área (m²)",
-        "year": "Ano", "parking": "Garagem", "amenities": "Características",
-        "tone": "Estratégia",
-        "tones": ["Profissional Padrão", "Ultra-Luxo", "Potencial de Investimento", "Minimalista Moderno", "Conforto Familiar", "Férias", "Nova Construção", "Comercial"],
-        "custom_inst": "📝 Notas Especiais",
-        "agent_section": "👤 Perfil do Agente",
-        "agent_name": "O Seu Nome", "agent_co": "Agência / Empresa",
-        "agent_phone": "Telefone", "agent_email": "Email",
-        "ph_prop": "Ex: Apartamento T3, Moradia de Luxo...",
-        "ph_price": "Ex: 500.000€ ou 1.500€/mês...",
-        "ph_loc": "Ex: Lisboa, Portugal...",
-        "ph_beds": "ex. 3", "ph_baths": "ex. 2", "ph_sqm": "ex. 150",
-        "ph_year": "ex. 2020", "ph_park": "ex. 1 garagem",
-        "ph_amen": "ex. Piscina, ginásio, vista mar",
-        "custom_inst_ph": "Ex: Tetos altos, perto do metrô...",
-        "ph_an": "ex. Ana Silva", "ph_ac": "ex. Luxe Realty Portugal",
-        "ph_ap": "ex. +351 91 000 0000", "ph_ae": "ex. ana@luxerealty.pt",
-        "btn": "🚀 GERAR PACOTE DE MARKETING COMPLETO",
-        "upload_label": "📸 Enviar Fotos Aqui",
-        "result": "💎 O Seu Pacote de Marketing",
-        "loading": "Preparando seu pacote de marketing premium...",
-        "empty": "Aguardando imagens para análise.",
-        "download": "📥 Exportar Pacote Completo",
-        "dl_section": "📥 Descarregar",
-        "save_btn": "💾 Guardar no Histórico",
-        "saved_msg": "✅ Guardado!",
+        "subtitle": "Transforme fotos em anúncios premium, kits de redes sociais, roteiros de vídeo e fichas técnicas instantaneamente.",
+        "settings": "Configuração",
+        "interface_lang": "🌐 Idioma da Interface",
+        "target_lang": "✍️ Escrever Anúncio Em...",
+        "prop_type": "Tipo de Imóvel",
+        "price": "Preço de Mercado",
+        "location": "Localização",
+        "tone": "Estratégia de Marketing",
+        "bedrooms": "Quartos",
+        "bathrooms": "Banheiros",
+        "area": "Área (m²)",
+        "year_built": "Ano de Construção",
+        "furnishing": "Mobiliário",
+        "furnishing_opts": ["Não especificado", "Completamente Mobilado", "Semi-Mobilado", "Sem Mobília"],
+        "target_audience": "Público-Alvo",
+        "audience_opts": ["Mercado Geral", "Compradores de Luxo", "Investidores", "Expats e Internacionais", "Primeiros Compradores", "Mercado de Férias"],
+        "tones": ["Profissional Padrão", "Ultra-Luxo", "Foco em Investimento", "Minimalista Moderno", "Vida Familiar", "Aluguel de Temporada"],
+        "ph_prop": "Ex: Villa 3 quartos, Apartamento Studio...",
+        "ph_price": "Ex: R$2.500.000 ou €2.500/mês...",
+        "ph_loc": "Ex: Lisboa, Algarve, São Paulo...",
+        "ph_beds": "Ex: 3",
+        "ph_baths": "Ex: 2",
+        "ph_area": "Ex: 185",
+        "ph_year": "Ex: 2023",
+        "custom_inst": "📝 Notas Especiais e Destaques",
+        "custom_inst_ph": "Ex: Piscina privativa, vista panorâmica, casa inteligente...",
+        "btn": "✨ GERAR ATIVOS DE MARKETING COMPLETOS",
+        "upload_label": "📸 Enviar Fotos do Imóvel",
+        "upload_hint": "JPG, PNG, WEBP, JPEG · Até 200MB por arquivo",
+        "result": "💎 Pré-visualização Executiva",
+        "loading": "Preparando seu ecossistema de marketing premium...",
+        "empty_title": "Pronto para Transformar seu Anúncio",
+        "empty_sub": "Faça upload das fotos e preencha os detalhes à esquerda.",
+        "download_all": "📥 Exportar Tudo (TXT)",
+        "download_tab": "📥 Exportar Esta Seção",
+        "copy_btn": "📋 Copiar",
+        "save_btn": "💾 Salvar Alterações",
+        "saved_msg": "✅ Salvo!",
         "error": "Erro:",
-        "nav_gen": "🏠 Gerar", "nav_tools": "⚡ Ferramentas", "nav_hist": "📁 Histórico",
-        "tab1": "📝 Anúncio Premium", "tab2": "📱 Kit Redes Sociais",
-        "tab3": "🎬 Roteiros de Vídeo", "tab4": "⚙️ Especificações",
-        "tab5": "📧 Emails", "tab6": "🔍 SEO",
-        "lbl1": "Texto de Vendas", "lbl2": "Conteúdo Social",
-        "lbl3": "Script de Vídeo", "lbl4": "Especificações Técnicas",
-        "lbl5": "Templates de Email", "lbl6": "Pack SEO & Digital",
-        "words": "palavras", "chars": "caracteres",
-        "fh_ok": "✅ Habitação justa — sem problemas",
-        "fh_warn": "⚠️ Rever: ",
-        "copy_btn": "📋 Copiar", "copied": "✅ Copiado!",
-        "regen": "🔄 Regenerar",
-        "tools_title": "⚡ Ferramentas IA para Agentes",
-        "tools_sub": "Ferramentas profissionais — um clique, resultados instantâneos.",
-        "tool_run": "▶ Gerar", "tool_clear": "✕ Limpar",
-        "hist_title": "📁 Imóveis Guardados",
-        "hist_empty": "Ainda sem imóveis guardados.",
-        "hist_load": "Carregar", "hist_del": "Apagar", "hist_dl": "Descarregar",
+        "tab_main": "Anúncio Premium",
+        "tab_social": "Kit Redes Sociais",
+        "tab_video": "Roteiros de Vídeo",
+        "tab_tech": "Especificações",
+        "tab_email": "Campanha de Email",
+        "tab_seo": "SEO & Web Copy",
+        "label_main": "Texto de Vendas",
+        "label_social": "Conteúdo Social",
+        "label_video": "Roteiro de Vídeo",
+        "label_tech": "Especificações Técnicas",
+        "label_email": "Campanha Email",
+        "label_seo": "Texto SEO",
+        "photos_uploaded": "fotos enviadas",
+        "generating": "Gerando...",
+        "features": ["Anúncio Premium", "Redes Sociais", "Script Cinemático", "Especificações", "Email", "SEO"],
+        "pro_tip": "💡 Dica Pro",
+        "pro_tip_text": "Envie 3 a 6 fotos incluindo exterior, interior e características principais para melhores resultados.",
+        "clear_btn": "🗑️ Limpar Tudo",
+        "history_title": "Gerações Recentes",
+        "no_history": "Sem gerações anteriores nesta sessão.",
     },
     "日本語": {
-        "title": "SarSa AI | 不動産インテリジェンスプラットフォーム",
+        "title": "SarSa AI | 不動産インテリジェンス・プラットフォーム",
         "service_desc": "オールインワン物件インテリジェンス＆グローバル販売自動化",
-        "subtitle": "物件写真をプレミアム広告、SNSキット、動画台本、メールテンプレート、SEOパックに瞬時に変換。",
-        "settings": "⚙️ 設定",
+        "subtitle": "物件写真をプレミアム広告、SNSキット、動画台本、技術仕様書に瞬時に変換。",
+        "settings": "設定",
+        "interface_lang": "🌐 インターフェース言語",
         "target_lang": "✍️ 作成言語...",
-        "prop_type": "物件種別", "price": "市場価格", "location": "所在地",
-        "beds": "寝室", "baths": "浴室", "sqm": "面積 (㎡)",
-        "year": "築年", "parking": "駐車場", "amenities": "特徴・設備",
-        "tone": "戦略",
-        "tones": ["スタンダードプロ", "ウルトララグジュアリー", "投資ポテンシャル", "モダンミニマリスト", "ファミリーコンフォート", "バケーション", "新築", "商業"],
-        "custom_inst": "📝 特記事項",
-        "agent_section": "👤 エージェントプロフィール",
-        "agent_name": "お名前", "agent_co": "会社・代理店",
-        "agent_phone": "電話", "agent_email": "メール",
+        "prop_type": "物件種別",
+        "price": "市場価格",
+        "location": "所在地",
+        "tone": "マーケティング戦略",
+        "bedrooms": "寝室数",
+        "bathrooms": "浴室数",
+        "area": "面積（㎡）",
+        "year_built": "建築年",
+        "furnishing": "家具",
+        "furnishing_opts": ["未指定", "フル家具付", "半家具付", "家具なし"],
+        "target_audience": "ターゲット層",
+        "audience_opts": ["一般市場", "富裕層バイヤー", "投資家", "外国人・海外在住", "初購入者", "バケーション市場"],
+        "tones": ["スタンダードプロ", "ウルトララグジュアリー", "投資重視", "モダンミニマリスト", "ファミリー向け", "バケーションレンタル"],
         "ph_prop": "例：3LDKマンション、高級別荘...",
         "ph_price": "例：5000万円、月20万円...",
         "ph_loc": "例：東京都港区...",
-        "ph_beds": "例. 3", "ph_baths": "例. 2", "ph_sqm": "例. 150",
-        "ph_year": "例. 2020", "ph_park": "例. 1台",
-        "ph_amen": "例. プール、ジム、海景",
-        "custom_inst_ph": "例：高い天井、駅近...",
-        "ph_an": "例. 田中 太郎", "ph_ac": "例. ラックスリアルティ",
-        "ph_ap": "例. +81 3 0000 0000", "ph_ae": "例. tanaka@luxerealty.jp",
-        "btn": "🚀 完全なマーケティングパッケージを生成",
+        "ph_beds": "例：3",
+        "ph_baths": "例：2",
+        "ph_area": "例：185",
+        "ph_year": "例：2023",
+        "custom_inst": "📝 特記事項・アピールポイント",
+        "custom_inst_ph": "例：プライベートプール、パノラマビュー、スマートホーム...",
+        "btn": "✨ 完全なマーケティング資産を生成",
         "upload_label": "📸 ここに写真をアップロード",
-        "result": "💎 マーケティングパッケージ",
-        "loading": "プレミアムマーケティングパッケージを構築中...",
-        "empty": "分析用の画像を待機中。",
-        "download": "📥 パッケージ全体をエクスポート",
-        "dl_section": "📥 ダウンロード",
-        "save_btn": "💾 履歴に保存",
-        "saved_msg": "✅ 保存しました！",
+        "upload_hint": "JPG, PNG, WEBP, JPEG · ファイルあたり200MBまで",
+        "result": "💎 エグゼクティブプレビュー",
+        "loading": "マーケティングエコシステムを構築中...",
+        "empty_title": "物件掲載を最高品質へ",
+        "empty_sub": "写真をアップロードして左側の詳細情報を入力してください。",
+        "download_all": "📥 すべて出力（TXT）",
+        "download_tab": "📥 このセクションを出力",
+        "copy_btn": "📋 コピー",
+        "save_btn": "💾 変更を保存",
+        "saved_msg": "✅ 保存完了！",
         "error": "エラー:",
-        "nav_gen": "🏠 生成", "nav_tools": "⚡ エージェントツール", "nav_hist": "📁 履歴",
-        "tab1": "📝 プレミアム広告", "tab2": "📱 SNSキット",
-        "tab3": "🎬 動画台本", "tab4": "⚙️ 技術仕様",
-        "tab5": "📧 メール", "tab6": "🔍 SEOパック",
-        "lbl1": "セールスコピー", "lbl2": "SNSコンテンツ",
-        "lbl3": "動画台本", "lbl4": "技術仕様",
-        "lbl5": "メールテンプレート", "lbl6": "SEO＆デジタルパック",
-        "words": "語", "chars": "文字",
-        "fh_ok": "✅ 公正住宅 — 問題なし",
-        "fh_warn": "⚠️ 要確認: ",
-        "copy_btn": "📋 コピー", "copied": "✅ コピー完了！",
-        "regen": "🔄 再生成",
-        "tools_title": "⚡ AIエージェントツール",
-        "tools_sub": "不動産プロ向けツール — ワンクリックで即プロ品質。",
-        "tool_run": "▶ 生成", "tool_clear": "✕ クリア",
-        "hist_title": "📁 保存済み物件",
-        "hist_empty": "まだ保存された物件がありません。",
-        "hist_load": "読込", "hist_del": "削除", "hist_dl": "ダウンロード",
+        "tab_main": "プレミアム広告",
+        "tab_social": "SNSキット",
+        "tab_video": "動画台本",
+        "tab_tech": "技術仕様",
+        "tab_email": "メールキャンペーン",
+        "tab_seo": "SEO・Webコピー",
+        "label_main": "セールスコピー",
+        "label_social": "SNSコンテンツ",
+        "label_video": "動画台本",
+        "label_tech": "技術仕様",
+        "label_email": "メールキャンペーン",
+        "label_seo": "SEOテキスト",
+        "photos_uploaded": "枚の写真アップロード済",
+        "generating": "生成中...",
+        "features": ["プレミアム広告", "SNS", "シネマスクリプト", "技術仕様", "メール", "SEO"],
+        "pro_tip": "💡 プロヒント",
+        "pro_tip_text": "外観・内観・特徴を含む3〜6枚の写真をアップロードすると最良の結果が得られます。",
+        "clear_btn": "🗑️ すべて削除",
+        "history_title": "最近の生成",
+        "no_history": "このセッションに生成はありません。",
     },
     "中文 (简体)": {
         "title": "SarSa AI | 房地产智能平台",
         "service_desc": "全方位房产视觉智能与全球销售自动化",
-        "subtitle": "立即将房产照片转化为优质房源描述、社交媒体包、视频脚本、邮件模板和SEO套件。",
-        "settings": "⚙️ 配置",
+        "subtitle": "立即将房产照片转化为优质房源描述、社交媒体包、电影级视频脚本和技术规格。",
+        "settings": "配置",
+        "interface_lang": "🌐 界面语言",
         "target_lang": "✍️ 编写语言...",
-        "prop_type": "房产类型", "price": "市场价格", "location": "地点",
-        "beds": "卧室", "baths": "浴室", "sqm": "面积 (㎡)",
-        "year": "建造年份", "parking": "车位", "amenities": "主要特征",
-        "tone": "策略",
-        "tones": ["标准专业", "顶奢豪宅", "投资潜力", "现代简约", "家庭舒适", "度假租赁", "新开发", "商业"],
-        "custom_inst": "📝 特别备注",
-        "agent_section": "👤 经纪人资料",
-        "agent_name": "您的姓名", "agent_co": "中介 / 公司",
-        "agent_phone": "电话", "agent_email": "邮箱",
-        "ph_prop": "如 豪华别墅、3室2厅...",
-        "ph_price": "如 $500,000 或 $2,000/月...",
-        "ph_loc": "如 上海市浦东新区...",
-        "ph_beds": "如. 3", "ph_baths": "如. 2", "ph_sqm": "如. 150",
-        "ph_year": "如. 2020", "ph_park": "如. 1个车位",
-        "ph_amen": "如. 泳池、健身房、海景",
-        "custom_inst_ph": "如：挑高天花板，靠近地铁...",
-        "ph_an": "如. 张伟", "ph_ac": "如. 豪华地产集团",
-        "ph_ap": "如. +86 138 0000 0000", "ph_ae": "如. zhang@luxerealty.cn",
-        "btn": "🚀 生成完整营销套餐",
-        "upload_label": "📸 在此处上传照片",
-        "result": "💎 您的营销套餐",
-        "loading": "正在打造您的高端营销套餐...",
-        "empty": "等待图像进行分析。",
-        "download": "📥 导出完整套餐",
-        "dl_section": "📥 下载",
-        "save_btn": "💾 保存到历史",
+        "prop_type": "房产类型",
+        "price": "市场价格",
+        "location": "地点",
+        "tone": "营销策略",
+        "bedrooms": "卧室",
+        "bathrooms": "浴室",
+        "area": "面积（㎡）",
+        "year_built": "建造年份",
+        "furnishing": "装修情况",
+        "furnishing_opts": ["未指定", "全装修", "半装修", "毛坯"],
+        "target_audience": "目标受众",
+        "audience_opts": ["大众市场", "豪华买家", "投资者", "外籍人士和国际买家", "首次购房者", "度假市场"],
+        "tones": ["标准专业", "顶奢豪宅", "投资潜力", "现代简约", "家庭生活", "度假租赁"],
+        "ph_prop": "例如：3居室公寓，豪华别墅...",
+        "ph_price": "例如：¥5,000,000 或 $2,000/月...",
+        "ph_loc": "例如：上海市浦东新区...",
+        "ph_beds": "例如：3",
+        "ph_baths": "例如：2",
+        "ph_area": "例如：185",
+        "ph_year": "例如：2023",
+        "custom_inst": "📝 特别备注和亮点",
+        "custom_inst_ph": "例如：私人泳池、全景视野、智能家居系统...",
+        "btn": "✨ 生成完整营销资产",
+        "upload_label": "📸 在此处上传房产照片",
+        "upload_hint": "JPG、PNG、WEBP、JPEG · 每个文件最大200MB",
+        "result": "💎 高管预览",
+        "loading": "正在打造您的高端营销生态系统...",
+        "empty_title": "准备好提升您的房源",
+        "empty_sub": "上传房产照片并填写左侧的详细信息。",
+        "download_all": "📥 导出全部（TXT）",
+        "download_tab": "📥 导出此部分",
+        "copy_btn": "📋 复制",
+        "save_btn": "💾 保存更改",
         "saved_msg": "✅ 已保存！",
         "error": "错误:",
-        "nav_gen": "🏠 生成", "nav_tools": "⚡ 经纪人工具", "nav_hist": "📁 历史",
-        "tab1": "📝 优质房源", "tab2": "📱 社交媒体包",
-        "tab3": "🎬 视频脚本", "tab4": "⚙️ 技术细节",
-        "tab5": "📧 邮件模板", "tab6": "🔍 SEO套件",
-        "lbl1": "销售文案", "lbl2": "社媒内容",
-        "lbl3": "视频脚本", "lbl4": "技术规格",
-        "lbl5": "邮件模板", "lbl6": "SEO与数字营销包",
-        "words": "词", "chars": "字符",
-        "fh_ok": "✅ 公平住房 — 无问题",
-        "fh_warn": "⚠️ 请检查: ",
-        "copy_btn": "📋 复制", "copied": "✅ 已复制！",
-        "regen": "🔄 重新生成",
-        "tools_title": "⚡ AI经纪人工具箱",
-        "tools_sub": "专业工具 — 一键即得专业成果。",
-        "tool_run": "▶ 生成", "tool_clear": "✕ 清除",
-        "hist_title": "📁 已保存房源",
-        "hist_empty": "还没有保存的房源。",
-        "hist_load": "加载", "hist_del": "删除", "hist_dl": "下载",
+        "tab_main": "优质房源",
+        "tab_social": "社交媒体包",
+        "tab_video": "视频脚本",
+        "tab_tech": "技术细节",
+        "tab_email": "电子邮件活动",
+        "tab_seo": "SEO和网络文案",
+        "label_main": "销售文案",
+        "label_social": "社媒内容",
+        "label_video": "视频脚本",
+        "label_tech": "技术规格",
+        "label_email": "电子邮件活动",
+        "label_seo": "SEO文案",
+        "photos_uploaded": "张照片已上传",
+        "generating": "生成中...",
+        "features": ["优质房源", "社交媒体", "电影脚本", "技术规格", "电子邮件", "SEO"],
+        "pro_tip": "💡 专业提示",
+        "pro_tip_text": "上传3-6张包括外观、内部和主要特征的照片以获得最佳效果。",
+        "clear_btn": "🗑️ 清除全部",
+        "history_title": "最近生成",
+        "no_history": "本次会话没有之前的生成。",
     },
     "العربية": {
         "title": "SarSa AI | منصة الذكاء العقاري",
         "service_desc": "ذكاء العقارات البصري المتكامل وأتمتة المبيعات العالمية",
-        "subtitle": "حوّل صور العقارات إلى إعلانات مميزة، باقات التواصل الاجتماعي، سيناريوهات الفيديو، البريد الإلكتروني وحزم SEO فوراً.",
-        "settings": "⚙️ الإعدادات",
-        "target_lang": "✍️ لغة الكتابة...",
-        "prop_type": "نوع العقار", "price": "سعر السوق", "location": "الموقع",
-        "beds": "غرف النوم", "baths": "الحمامات", "sqm": "المساحة (م²)",
-        "year": "سنة البناء", "parking": "موقف السيارات", "amenities": "المميزات",
-        "tone": "الاستراتيجية",
-        "tones": ["احترافي قياسي", "فخامة فائقة", "إمكانات استثمارية", "عصري بسيط", "راحة عائلية", "إيجار عطلات", "مشروع جديد", "تجاري"],
-        "custom_inst": "📝 ملاحظات خاصة",
-        "agent_section": "👤 ملف الوكيل",
-        "agent_name": "اسمك", "agent_co": "الوكالة / الشركة",
-        "agent_phone": "الهاتف", "agent_email": "البريد الإلكتروني",
-        "ph_prop": "مثال: شقة 3+1، فيلا فاخرة...",
-        "ph_price": "مثال: $500,000 أو $2,000 شهرياً...",
-        "ph_loc": "مثال: دبي، الإمارات...",
-        "ph_beds": "مثال. 3", "ph_baths": "مثال. 2", "ph_sqm": "مثال. 150",
-        "ph_year": "مثال. 2020", "ph_park": "مثال. موقف مغطى",
-        "ph_amen": "مثال. مسبح، صالة رياضية، إطلالة بحرية",
-        "custom_inst_ph": "مثال: أسقف عالية، بالقرب من المترو...",
-        "ph_an": "مثال. محمد الأحمد", "ph_ac": "مثال. مجموعة لوكس العقارية",
-        "ph_ap": "مثال. +971 50 000 0000", "ph_ae": "مثال. m@luxerealty.ae",
-        "btn": "🚀 إنشاء حزمة تسويقية متكاملة",
-        "upload_label": "📸 ضع الصور هنا",
-        "result": "💎 حزمتك التسويقية",
-        "loading": "جاري تجهيز حزمتك التسويقية الفاخرة...",
-        "empty": "في انتظار الصور لبدء التحليل المهني.",
-        "download": "📥 تصدير الحزمة الكاملة",
-        "dl_section": "📥 تحميل",
-        "save_btn": "💾 حفظ في السجل",
+        "subtitle": "حوّل صور العقارات إلى إعلانات مميزة، باقات تواصل اجتماعي، سيناريوهات فيديو، ومواصفات فنية فوراً.",
+        "settings": "الإعدادات",
+        "interface_lang": "🌐 لغة الواجهة",
+        "target_lang": "✍️ لغة كتابة الإعلان...",
+        "prop_type": "نوع العقار",
+        "price": "سعر السوق",
+        "location": "الموقع",
+        "tone": "استراتيجية التسويق",
+        "bedrooms": "غرف النوم",
+        "bathrooms": "الحمامات",
+        "area": "المساحة (م²)",
+        "year_built": "سنة البناء",
+        "furnishing": "التأثيث",
+        "furnishing_opts": ["غير محدد", "مفروش بالكامل", "مفروش جزئياً", "غير مفروش"],
+        "target_audience": "الجمهور المستهدف",
+        "audience_opts": ["السوق العام", "مشترو الفخامة", "المستثمرون", "المغتربون والدوليون", "المشترون الأوائل", "سوق العطلات"],
+        "tones": ["احترافي قياسي", "فخامة فائقة", "تركيز الاستثمار", "عصري بسيط", "الحياة العائلية", "الإيجار الموسمي"],
+        "ph_prop": "مثال: فيلا 3 غرف، شقة استوديو...",
+        "ph_price": "مثال: $850,000 أو $2,500 شهرياً...",
+        "ph_loc": "مثال: دبي، الرياض، أبوظبي...",
+        "ph_beds": "مثال: 3",
+        "ph_baths": "مثال: 2",
+        "ph_area": "مثال: 185",
+        "ph_year": "مثال: 2023",
+        "custom_inst": "📝 ملاحظات خاصة ومميزات",
+        "custom_inst_ph": "مثال: مسبح خاص، إطلالة بانورامية، نظام المنزل الذكي...",
+        "btn": "✨ إنشاء أصول تسويقية متكاملة",
+        "upload_label": "📸 ضع صور العقار هنا",
+        "upload_hint": "JPG, PNG, WEBP, JPEG · حتى 200MB لكل ملف",
+        "result": "💎 معاينة تنفيذية",
+        "loading": "جاري تجهيز منظومتك التسويقية الفاخرة...",
+        "empty_title": "جاهز لتحويل إعلانك",
+        "empty_sub": "ارفع الصور واملأ التفاصيل على اليسار.",
+        "download_all": "📥 تصدير الكل (TXT)",
+        "download_tab": "📥 تصدير هذا القسم",
+        "copy_btn": "📋 نسخ",
+        "save_btn": "💾 حفظ التغييرات",
         "saved_msg": "✅ تم الحفظ!",
         "error": "خطأ:",
-        "nav_gen": "🏠 إنشاء", "nav_tools": "⚡ أدوات الوكيل", "nav_hist": "📁 السجل",
-        "tab1": "📝 إعلان مميز", "tab2": "📱 باقة التواصل",
-        "tab3": "🎬 سيناريوهات الفيديو", "tab4": "⚙️ تفاصيل",
-        "tab5": "📧 البريد الإلكتروني", "tab6": "🔍 حزمة SEO",
-        "lbl1": "نص المبيعات", "lbl2": "محتوى التواصل",
-        "lbl3": "سيناريو الفيديو", "lbl4": "المواصفات الفنية",
-        "lbl5": "قوالب البريد الإلكتروني", "lbl6": "حزمة SEO الرقمية",
-        "words": "كلمة", "chars": "حرف",
-        "fh_ok": "✅ الإسكان العادل — لا مشاكل",
-        "fh_warn": "⚠️ راجع المصطلحات: ",
-        "copy_btn": "📋 نسخ", "copied": "✅ تم النسخ!",
-        "regen": "🔄 إعادة الإنشاء",
-        "tools_title": "⚡ أدوات الوكيل بالذكاء الاصطناعي",
-        "tools_sub": "أدوات احترافية — نقرة واحدة، نتائج فورية.",
-        "tool_run": "▶ إنشاء", "tool_clear": "✕ مسح",
-        "hist_title": "📁 العقارات المحفوظة",
-        "hist_empty": "لا توجد عقارات محفوظة بعد.",
-        "hist_load": "تحميل", "hist_del": "حذف", "hist_dl": "تحميل",
-    },
+        "tab_main": "إعلان مميز",
+        "tab_social": "باقة التواصل الاجتماعي",
+        "tab_video": "سيناريوهات الفيديو",
+        "tab_tech": "تفاصيل تقنية",
+        "tab_email": "حملة بريد إلكتروني",
+        "tab_seo": "SEO ونص الويب",
+        "label_main": "نص المبيعات",
+        "label_social": "محتوى التواصل",
+        "label_video": "سيناريو الفيديو",
+        "label_tech": "المواصفات الفنية",
+        "label_email": "حملة البريد",
+        "label_seo": "نص SEO",
+        "photos_uploaded": "صور مرفوعة",
+        "generating": "جاري الإنشاء...",
+        "features": ["إعلان مميز", "تواصل اجتماعي", "سكريبت سينمائي", "مواصفات تقنية", "بريد إلكتروني", "SEO"],
+        "pro_tip": "💡 نصيحة احترافية",
+        "pro_tip_text": "ارفع 3-6 صور تتضمن الخارج والداخل والمميزات الرئيسية للحصول على أفضل النتائج.",
+        "clear_btn": "🗑️ مسح الكل",
+        "history_title": "الإنشاءات الأخيرة",
+        "no_history": "لا توجد إنشاءات سابقة في هذه الجلسة.",
+    }
 }
 
-# --- SESSION STATE ---
-for key, val in [
-    ("page", "generate"),
-    ("uretilen_ilan", ""), ("s1",""), ("s2",""), ("s3",""), ("s4",""), ("s5",""), ("s6",""),
-    ("output_ready", False),
-    ("history", []),
-    ("tool_out", ""), ("tool_title", ""),
-    ("prop_type", ""), ("price", ""), ("location", ""),
-    ("beds", ""), ("baths", ""), ("sqm", ""), ("year_built", ""),
-    ("parking", ""), ("amenities", ""), ("custom_inst", ""),
-    ("tone", ""), ("target_lang_input", "English"),
-    ("agent_name", ""), ("agent_co", ""), ("agent_phone", ""), ("agent_email", ""),
-]:
+# ─────────────────────────────────────────────
+# SESSION STATE
+# ─────────────────────────────────────────────
+defaults = {
+    "generated_content": "",
+    "prop_type": "",
+    "price": "",
+    "location": "",
+    "tone": "",
+    "custom_inst": "",
+    "target_lang_input": "English",
+    "bedrooms": "",
+    "bathrooms": "",
+    "area": "",
+    "year_built": "",
+    "furnishing_idx": 0,
+    "audience_idx": 0,
+    "generation_history": [],
+    "is_generating": False,
+}
+for key, val in defaults.items():
     if key not in st.session_state:
         st.session_state[key] = val
 
-# --- CSS: YOUR ORIGINAL STYLE + ENHANCEMENTS ---
+# ─────────────────────────────────────────────
+# MASTER CSS
+# ─────────────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700;800&display=swap');
-html, body, [class*="st-"] { font-family: 'Plus Jakarta Sans', sans-serif; }
-.stApp { background-color: #f8fafc; }
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap');
 
+/* ── GLOBAL ── */
+html, body, [class*="st-"], .stApp {
+    font-family: 'Inter', sans-serif !important;
+    background: #f0f4f8 !important;
+}
+h1, h2, h3, .stMarkdown h1, .stMarkdown h2 {
+    font-family: 'Sora', sans-serif !important;
+}
+
+/* ── HIDE STREAMLIT CHROME ── */
+#MainMenu, footer, header { display: none !important; }
+div[data-testid="stDecoration"] { display: none !important; }
 div[data-testid="stInputInstructions"] { display: none !important; }
-#MainMenu { visibility: hidden; }
-footer { visibility: hidden; }
-[data-testid="stToolbar"] { display: none !important; }
-[data-testid="stDecoration"] { display: none !important; }
+.stDeployButton { display: none !important; }
 span[data-testid="stIconMaterial"] { display: none !important; }
 
+/* ── MAIN CONTAINER ── */
 .block-container {
-    background: white;
-    padding: 2.5rem 3rem !important;
-    border-radius: 20px;
-    box-shadow: 0 15px 45px rgba(0,0,0,0.04);
-    margin-top: 1.5rem;
-    border: 1px solid #e2e8f0;
+    padding: 0 !important;
+    max-width: 100% !important;
+    background: transparent !important;
 }
-h1 { color: #0f172a !important; font-weight: 800 !important; text-align: center; }
-
-button, [data-baseweb="tab"], [data-testid="stFileUploader"],
-div[data-baseweb="select"], div[role="button"], .stSelectbox div {
-    cursor: pointer !important;
-}
-.stTextInput input, .stTextArea textarea { cursor: text !important; }
-
-.stButton > button {
-    background: #0f172a;
-    color: white !important;
-    border-radius: 10px;
-    padding: 12px 20px;
-    font-weight: 700;
-    width: 100%;
-    border: none;
-    font-size: 0.9rem;
-    transition: all 0.2s;
-}
-.stButton > button:hover {
-    background: #1e293b;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-    transform: translateY(-1px);
+.main .block-container {
+    padding: 0 !important;
 }
 
-.stDownloadButton > button {
-    background: white !important;
-    color: #0f172a !important;
-    border: 2px solid #e2e8f0 !important;
-    border-radius: 10px !important;
+/* ── SIDEBAR ── */
+[data-testid="stSidebar"] {
+    background: #ffffff !important;
+    border-right: 1px solid #e2e8f0 !important;
+    box-shadow: 4px 0 20px rgba(0,0,0,0.04) !important;
+}
+[data-testid="stSidebar"] > div:first-child {
+    padding: 1.5rem 1.2rem 2rem !important;
+}
+[data-testid="stSidebar"] .stSelectbox label,
+[data-testid="stSidebar"] .stTextInput label,
+[data-testid="stSidebar"] .stTextArea label,
+[data-testid="stSidebar"] .stSelectbox > label {
+    font-size: 0.72rem !important;
     font-weight: 600 !important;
+    color: #64748b !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.8px !important;
+    margin-bottom: 4px !important;
+}
+[data-testid="stSidebar"] .stTextInput input,
+[data-testid="stSidebar"] .stTextArea textarea,
+[data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] {
+    border-radius: 10px !important;
+    border: 1.5px solid #e2e8f0 !important;
+    background: #f8fafc !important;
+    font-size: 0.88rem !important;
     transition: all 0.2s !important;
 }
-.stDownloadButton > button:hover {
-    border-color: #0f172a !important;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
+[data-testid="stSidebar"] .stTextInput input:focus,
+[data-testid="stSidebar"] .stTextArea textarea:focus {
+    border-color: #3b82f6 !important;
+    background: #ffffff !important;
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.1) !important;
 }
 
+/* ── SIDEBAR SECTION HEADER ── */
+.sidebar-section {
+    font-family: 'Sora', sans-serif;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #1e293b;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    margin: 1.2rem 0 0.6rem 0;
+    padding: 0.5rem 0;
+    border-bottom: 2px solid #f1f5f9;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* ── MAIN HEADER ── */
+.sarsa-header {
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%);
+    padding: 2.5rem 3rem;
+    position: relative;
+    overflow: hidden;
+}
+.sarsa-header::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -10%;
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%);
+    pointer-events: none;
+}
+.sarsa-header::after {
+    content: '';
+    position: absolute;
+    bottom: -30%;
+    left: 10%;
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%);
+    pointer-events: none;
+}
+.sarsa-title {
+    font-family: 'Sora', sans-serif;
+    font-size: 2rem;
+    font-weight: 800;
+    color: #ffffff;
+    margin: 0 0 0.4rem 0;
+    letter-spacing: -0.5px;
+}
+.sarsa-subtitle-tag {
+    display: inline-block;
+    background: rgba(59,130,246,0.25);
+    color: #93c5fd;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 4px 12px;
+    border-radius: 20px;
+    border: 1px solid rgba(59,130,246,0.3);
+    margin-bottom: 0.7rem;
+}
+.sarsa-desc {
+    color: #94a3b8;
+    font-size: 0.95rem;
+    max-width: 600px;
+    line-height: 1.6;
+    font-weight: 400;
+}
+.sarsa-features {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 1.2rem;
+}
+.sarsa-feature-chip {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: #e2e8f0;
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 5px 12px;
+    border-radius: 20px;
+    backdrop-filter: blur(10px);
+}
+
+/* ── CONTENT WRAPPER ── */
+.content-wrapper {
+    padding: 2rem 2.5rem;
+}
+
+/* ── UPLOAD ZONE ── */
+[data-testid="stFileUploader"] {
+    border-radius: 16px !important;
+    border: 2px dashed #cbd5e1 !important;
+    background: #ffffff !important;
+    padding: 1.5rem !important;
+    transition: all 0.3s !important;
+}
+[data-testid="stFileUploader"]:hover {
+    border-color: #3b82f6 !important;
+    background: #f0f7ff !important;
+}
+[data-testid="stFileUploader"] label {
+    font-weight: 700 !important;
+    color: #1e293b !important;
+    font-size: 1rem !important;
+    font-family: 'Sora', sans-serif !important;
+}
+[data-testid="stFileUploader"] small {
+    color: #94a3b8 !important;
+    font-size: 0.8rem !important;
+}
+
+/* ── IMAGE GALLERY ── */
+.gallery-wrapper {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 1rem;
+    border: 1px solid #e2e8f0;
+    margin-top: 1rem;
+}
+.gallery-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #dbeafe;
+    color: #1d4ed8;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 20px;
+    margin-bottom: 0.8rem;
+}
+
+/* ── GENERATE BUTTON ── */
+.stButton > button {
+    font-family: 'Sora', sans-serif !important;
+    font-weight: 700 !important;
+    font-size: 1rem !important;
+    letter-spacing: 0.5px !important;
+    background: linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 14px !important;
+    padding: 0.85rem 2rem !important;
+    width: 100% !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 4px 15px rgba(59,130,246,0.35) !important;
+    cursor: pointer !important;
+}
+.stButton > button:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 25px rgba(59,130,246,0.45) !important;
+    background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%) !important;
+}
+.stButton > button:active {
+    transform: translateY(0px) !important;
+}
+
+/* ── DOWNLOAD BUTTON ── */
+[data-testid="stDownloadButton"] > button {
+    background: #f8fafc !important;
+    color: #334155 !important;
+    border: 1.5px solid #e2e8f0 !important;
+    border-radius: 10px !important;
+    font-weight: 600 !important;
+    font-size: 0.85rem !important;
+    box-shadow: none !important;
+    padding: 0.6rem 1.2rem !important;
+}
+[data-testid="stDownloadButton"] > button:hover {
+    background: #f1f5f9 !important;
+    border-color: #3b82f6 !important;
+    color: #1d4ed8 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 12px rgba(59,130,246,0.15) !important;
+}
+
+/* ── RESULT PANEL ── */
+.result-panel {
+    background: #ffffff;
+    border-radius: 20px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+    overflow: hidden;
+    margin-top: 1.5rem;
+}
+.result-panel-header {
+    background: linear-gradient(90deg, #0f172a 0%, #1e3a5f 100%);
+    padding: 1.2rem 1.8rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.result-panel-title {
+    font-family: 'Sora', sans-serif;
+    color: #ffffff;
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin: 0;
+}
+.result-panel-subtitle {
+    color: #94a3b8;
+    font-size: 0.8rem;
+    margin-top: 2px;
+}
+
+/* ── TABS ── */
 .stTabs [data-baseweb="tab-list"] {
-    background: #f1f5f9;
-    border-radius: 12px;
-    padding: 4px;
-    gap: 2px;
+    background: #f8fafc !important;
+    border-radius: 0 !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    padding: 0 1.8rem !important;
+    gap: 0 !important;
 }
 .stTabs [data-baseweb="tab"] {
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 0.82rem;
-    color: #64748b;
-    padding: 8px 14px;
-    white-space: nowrap;
+    font-family: 'Inter', sans-serif !important;
+    font-weight: 600 !important;
+    font-size: 0.83rem !important;
+    color: #64748b !important;
+    padding: 0.9rem 1.2rem !important;
+    border-bottom: 3px solid transparent !important;
+    background: transparent !important;
+    border-radius: 0 !important;
+    transition: all 0.2s !important;
+}
+.stTabs [data-baseweb="tab"]:hover {
+    color: #1d4ed8 !important;
+    background: rgba(59,130,246,0.05) !important;
 }
 .stTabs [aria-selected="true"] {
-    background-color: #0f172a !important;
-    color: white !important;
-    border-radius: 8px;
+    color: #1d4ed8 !important;
+    border-bottom: 3px solid #1d4ed8 !important;
+    background: transparent !important;
 }
-.stTabs [data-baseweb="tab-highlight"] { display: none !important; }
+.stTabs [data-baseweb="tab-panel"] {
+    padding: 1.5rem 1.8rem !important;
+}
 
+/* ── TEXT AREAS ── */
 .stTextArea textarea {
-    border-radius: 12px;
-    border: 1.5px solid #e2e8f0;
-    font-size: 0.9rem;
-    line-height: 1.7;
-    background: #fafafa;
-    transition: border-color 0.2s;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 0.88rem !important;
+    line-height: 1.7 !important;
+    border-radius: 12px !important;
+    border: 1.5px solid #e2e8f0 !important;
+    background: #fafbfc !important;
+    color: #1e293b !important;
+    padding: 1rem !important;
+    resize: vertical !important;
+    transition: border-color 0.2s !important;
 }
 .stTextArea textarea:focus {
-    border-color: #0f172a !important;
-    box-shadow: 0 0 0 3px rgba(15,23,42,0.06) !important;
-    background: white;
+    border-color: #3b82f6 !important;
+    background: #fff !important;
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.1) !important;
 }
-
-.stProgress > div > div > div > div {
-    background: linear-gradient(90deg, #0f172a, #334155) !important;
-}
-
-/* NAV BUTTONS */
-div.nav-active > div > button,
-div.nav-active > div[data-testid="stButton"] > button {
-    background: #0f172a !important;
-    color: white !important;
+.stTextArea label {
+    font-size: 0.72rem !important;
     font-weight: 700 !important;
-    box-shadow: 0 2px 8px rgba(15,23,42,0.2) !important;
-}
-div.nav-inactive > div > button,
-div.nav-inactive > div[data-testid="stButton"] > button {
-    background: #f1f5f9 !important;
-    color: #475569 !important;
-    font-weight: 600 !important;
-    border: none !important;
-    box-shadow: none !important;
-}
-div.nav-inactive > div > button:hover,
-div.nav-inactive > div[data-testid="stButton"] > button:hover {
-    background: #e2e8f0 !important;
-    color: #0f172a !important;
+    color: #64748b !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.8px !important;
 }
 
-/* COPY BTN */
-.sarsa-copy-btn {
-    display: block; width: 100%;
-    background: white; color: #0f172a;
-    border: 2px solid #e2e8f0; border-radius: 10px;
-    padding: 8px 16px; font-size: 0.85rem; font-weight: 600;
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    cursor: pointer; transition: all 0.2s; text-align: center;
-}
-.sarsa-copy-btn:hover { border-color: #0f172a; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-
-/* STAT CHIPS */
-.sarsa-chips { display: flex; gap: 8px; margin: 8px 0 12px; flex-wrap: wrap; }
-.sarsa-chip {
-    background: #f1f5f9; color: #64748b;
-    font-size: 0.72rem; font-weight: 600;
-    padding: 3px 10px; border-radius: 20px;
-    border: 1px solid #e2e8f0;
-}
-.sarsa-fh-ok {
-    display: inline-flex; align-items: center; gap: 5px;
-    background: #f0fdf4; color: #16a34a;
-    border: 1px solid #bbf7d0; border-radius: 20px;
-    padding: 3px 12px; font-size: 0.75rem; font-weight: 600;
-    margin: 5px 0 12px;
-}
-.sarsa-fh-warn {
-    display: inline-flex; align-items: center; gap: 5px;
-    background: #fffbeb; color: #d97706;
-    border: 1px solid #fde68a; border-radius: 20px;
-    padding: 3px 12px; font-size: 0.75rem; font-weight: 600;
-    margin: 5px 0 12px;
+/* ── INFO / WARNING / SUCCESS BOXES ── */
+.stInfo, .stSuccess, .stWarning {
+    border-radius: 12px !important;
 }
 
-/* TOOL CARDS */
-.sarsa-tool-card {
-    background: #f8fafc;
-    border: 1.5px solid #e2e8f0;
-    border-radius: 14px;
-    padding: 1rem 1.1rem;
-    margin-bottom: 0.6rem;
-    transition: all 0.2s;
-}
-.sarsa-tool-card:hover { border-color: #94a3b8; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-.sarsa-tool-name { font-weight: 700; font-size: 0.95rem; color: #0f172a; margin-bottom: 4px; }
-.sarsa-tool-desc { font-size: 0.8rem; color: #64748b; line-height: 1.4; }
-
-/* HISTORY CARDS */
-.sarsa-hist-card {
-    background: #f8fafc;
-    border: 1.5px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 0.9rem 1.1rem;
-    margin-bottom: 0.55rem;
-}
-
-/* SECTION DIVIDER */
-.sarsa-divider { height: 1px; background: #e2e8f0; margin: 1.5rem 0; }
-
-/* EMPTY STATE */
-.sarsa-empty {
-    background: #f8fafc;
-    border: 2px dashed #e2e8f0;
-    border-radius: 16px;
-    padding: 4rem 2rem;
+/* ── EMPTY STATE ── */
+.empty-state {
     text-align: center;
-    margin-top: 0.5rem;
+    padding: 4rem 2rem;
+    color: #94a3b8;
 }
-.sarsa-empty-icon { font-size: 2.5rem; margin-bottom: 0.8rem; }
-.sarsa-empty-title { font-size: 1.2rem; font-weight: 700; color: #0f172a; margin-bottom: 0.3rem; }
-.sarsa-empty-sub { font-size: 0.88rem; color: #94a3b8; }
+.empty-state-icon {
+    font-size: 3.5rem;
+    margin-bottom: 1rem;
+    opacity: 0.6;
+}
+.empty-state-title {
+    font-family: 'Sora', sans-serif;
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #475569;
+    margin-bottom: 0.5rem;
+}
+.empty-state-sub {
+    font-size: 0.9rem;
+    color: #94a3b8;
+    max-width: 400px;
+    margin: 0 auto;
+    line-height: 1.6;
+}
 
-/* RESULT HEADER */
-.sarsa-result-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem; }
-.sarsa-result-title { font-size: 1.4rem; font-weight: 800; color: #0f172a; }
+/* ── STATS BAR ── */
+.stats-bar {
+    display: flex;
+    gap: 1.5rem;
+    padding: 1rem 1.8rem;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    flex-wrap: wrap;
+}
+.stat-item {
+    text-align: center;
+}
+.stat-number {
+    font-family: 'Sora', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1d4ed8;
+}
+.stat-label {
+    font-size: 0.7rem;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* ── PRO TIP ── */
+.pro-tip-box {
+    background: linear-gradient(135deg, #eff6ff, #f0fdf4);
+    border: 1px solid #bfdbfe;
+    border-radius: 12px;
+    padding: 0.9rem 1.2rem;
+    margin-top: 0.8rem;
+    font-size: 0.82rem;
+    color: #1e40af;
+    line-height: 1.5;
+}
+
+/* ── PHOTO COUNTER BADGE ── */
+.photo-badge {
+    display: inline-flex;
+    align-items: center;
+    background: #1d4ed8;
+    color: white;
+    border-radius: 20px;
+    padding: 3px 10px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    gap: 4px;
+}
+
+/* ── GENERATION PROGRESS ── */
+.gen-progress {
+    background: linear-gradient(90deg, #dbeafe, #ede9fe);
+    border: 1px solid #bfdbfe;
+    border-radius: 12px;
+    padding: 1.2rem;
+    text-align: center;
+    color: #1e40af;
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+/* ── SPINNER OVERRIDE ── */
+.stSpinner > div {
+    border-top-color: #3b82f6 !important;
+}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* ── CURSOR FIXES ── */
+button, [data-baseweb="tab"], [data-testid="stFileUploader"],
+div[data-baseweb="select"], .stSelectbox div, .stDownloadButton {
+    cursor: pointer !important;
+}
+
+/* ── METRIC CARDS ── */
+.metric-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 1.5rem;
+}
+.metric-card {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 1rem;
+    text-align: center;
+}
+.metric-card-value {
+    font-family: 'Sora', sans-serif;
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: #0f172a;
+}
+.metric-card-label {
+    font-size: 0.72rem;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 2px;
+}
 </style>
 """, unsafe_allow_html=True)
 
-# --- HELPERS ---
-FAIR_HOUSING_TERMS = [
-    "adults only", "no children", "white neighborhood",
-    "christian neighborhood", "english speaking only", "families only",
-]
-
-def check_fair_housing(text):
-    tl = text.lower()
-    return [term for term in FAIR_HOUSING_TERMS if term in tl]
-
-def extract_section(raw, n):
-    m = re.search(rf"##\s*SECTION_{n}.*?(?=##\s*SECTION_|\Z)", raw, re.DOTALL | re.IGNORECASE)
-    if not m:
-        return ""
-    lines = m.group(0).strip().splitlines()
-    return "\n".join(lines[1:]).strip()
-
-def build_prompt(lang, strategy):
-    ss = st.session_state
-    agent_parts = [x for x in [ss.agent_name, ss.agent_co, ss.agent_phone, ss.agent_email] if x]
-    agent_info = " | ".join(agent_parts) if agent_parts else "not provided"
-    prop_block = f"""Property: {ss.prop_type or 'Residential Property'} | Location: {ss.location or 'Undisclosed'} | Price: {ss.price or 'Price on Request'}
-Beds: {ss.beds or 'N/A'} | Baths: {ss.baths or 'N/A'} | Size: {ss.sqm or 'N/A'} m² | Year: {ss.year_built or 'N/A'} | Parking: {ss.parking or 'N/A'}
-Features: {ss.amenities or 'TBC'} | Notes: {ss.custom_inst or 'None'}
-Agent: {agent_info}"""
-    return f"""You are SarSa AI — the world's most advanced real estate marketing platform.
-PROPERTY DATA:
-{prop_block}
-STRATEGY: {strategy}
-OUTPUT LANGUAGE: {lang} — write ALL content in this language.
-
-Carefully analyse every uploaded photo. Note architecture, finishes, light, views, condition.
-
-Generate a COMPLETE 6-section package. Use EXACTLY these markers:
-
-## SECTION_1 — PRIME LISTING COPY
-450–650 words. ALL-CAPS headline → emotional opening (3–4 sentences) → living spaces (reference photos) → kitchen/bathrooms → outdoor/amenities → location highlights → value proposition → CTA with agent contact.
-
-## SECTION_2 — SOCIAL MEDIA KIT
-📸 INSTAGRAM: Full caption (up to 2200 chars) + 25 hashtags
-👥 FACEBOOK: 200–280 words, community-focused, price prominent
-💼 LINKEDIN: 150–200 words, investment angle
-🐦 X/TWITTER: Max 270 chars + 4 hashtags
-📱 WHATSAPP: Max 155 chars, price + feature + contact
-
-## SECTION_3 — CINEMATIC VIDEO SCRIPT
-Title card → 7 scenes each with [CAMERA:] [VOICEOVER:] [DURATION:] → Music direction → Closing card with agent details → YouTube description (150 words) + 10 tags
-
-## SECTION_4 — TECHNICAL SPECIFICATIONS
-Key specs table → Room-by-room from photos → Amenities checklist (✓/—) → Building notes → Legal placeholder → Contact info
-
-## SECTION_5 — EMAIL TEMPLATES
-📧 EMAIL 1 — JUST LISTED: Subject + 150–200 word body + signature
-📧 EMAIL 2 — POST-VIEWING: Subject + 120–150 word body + signature
-📧 EMAIL 3 — PRICE REDUCTION: Subject + 110–130 word body + signature
-
-## SECTION_6 — SEO & DIGITAL MARKETING
-20 ranked SEO keywords → 3 meta descriptions (155 chars each with CTA) → Google Ads (3 headlines 30 chars, 2 descriptions 90 chars) → Instagram hashtags by category → 10 YouTube tags → 5 Pinterest board names → Posting calendar (best day + time per platform)
-
-Write every word in {lang}. Reference real photo details. Zero generic filler."""
-
-def save_to_history():
-    ss = st.session_state
-    entry = {
-        "id": str(datetime.now().timestamp()),
-        "date": datetime.now().strftime("%d %b %Y · %H:%M"),
-        "prop": ss.prop_type or "Property",
-        "loc": ss.location or "—",
-        "price": ss.price or "—",
-        "s1": ss.s1, "s2": ss.s2, "s3": ss.s3,
-        "s4": ss.s4, "s5": ss.s5, "s6": ss.s6,
-    }
-    ss.history.insert(0, entry)
-    if len(ss.history) > 50:
-        ss.history = ss.history[:50]
-
-def full_export():
-    ss = st.session_state
-    out = f"SARSA AI — COMPLETE MARKETING PACKAGE\n{'='*60}\n"
-    out += f"Property: {ss.prop_type} | {ss.location} | {ss.price}\n"
-    out += f"Generated: {datetime.now().strftime('%d %b %Y %H:%M')}\n{'='*60}\n\n"
-    for i in range(1, 7):
-        out += f"{'─'*60}\nSECTION {i}\n{'─'*60}\n{ss.get(f's{i}','')}\n\n"
-    return out
-
-def copy_btn(text, lbl, lbl_done, uid):
-    safe = text.replace("\\","\\\\").replace("`","\\`").replace("$","\\$").replace("'","\\'")
-    l1 = lbl.replace("'","\\'"); l2 = lbl_done.replace("'","\\'")
-    st.markdown(f"""<button class='sarsa-copy-btn' id='cpb_{uid}'
-      onclick="navigator.clipboard.writeText(`{safe}`).then(()=>{{
-        var b=document.getElementById('cpb_{uid}');b.textContent='{l2}';
-        setTimeout(()=>b.textContent='{l1}',2000);}})">
-    {l1}</button>""", unsafe_allow_html=True)
-
-def render_section(sk, fname, show_fhc=False):
-    val = st.session_state.get(sk, "")
-    new = st.text_area("", value=val, height=480, key=f"ta_{sk}", label_visibility="collapsed")
-    if new != val:
-        st.session_state[sk] = new
-    w = len(new.split()) if new else 0
-    c = len(new) if new else 0
-    st.markdown(f"<div class='sarsa-chips'><span class='sarsa-chip'>📊 {w} {t['words']}</span><span class='sarsa-chip'>✏️ {c} {t['chars']}</span></div>", unsafe_allow_html=True)
-    if show_fhc and new:
-        flags = check_fair_housing(new)
-        if flags:
-            st.markdown(f"<div class='sarsa-fh-warn'>{t['fh_warn']}{', '.join(flags)}</div>", unsafe_allow_html=True)
-        else:
-            st.markdown(f"<div class='sarsa-fh-ok'>{t['fh_ok']}</div>", unsafe_allow_html=True)
-    bc1, bc2 = st.columns(2)
-    with bc1:
-        st.download_button(t["dl_section"], data=new,
-            file_name=f"sarsa_{fname}_{datetime.now().strftime('%Y%m%d')}.txt",
-            key=f"dl_{sk}", use_container_width=True)
-    with bc2:
-        copy_btn(new, t["copy_btn"], t["copied"], sk)
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# SIDEBAR — YOUR ORIGINAL STRUCTURE + NEW FIELDS
-# ═══════════════════════════════════════════════════════════════════════════════
+# ─────────────────────────────────────────────
+# SIDEBAR
+# ─────────────────────────────────────────────
 with st.sidebar:
     logo_img = load_logo("SarSa_Logo_Transparent.png")
     if logo_img:
         st.image(logo_img, use_container_width=True)
     else:
-        st.markdown("<h2 style='text-align:center; color:#0f172a;'>SARSA AI</h2>", unsafe_allow_html=True)
+        st.markdown("""
+        <div style="text-align:center; padding: 1rem 0 0.5rem 0;">
+          <div style="font-family:'Sora',sans-serif; font-size:1.6rem; font-weight:800;
+                      background:linear-gradient(135deg,#3b82f6,#8b5cf6); -webkit-background-clip:text;
+                      -webkit-text-fill-color:transparent;">SarSa AI</div>
+          <div style="font-size:0.7rem; color:#94a3b8; letter-spacing:2px; text-transform:uppercase;">Real Estate Intelligence</div>
+        </div>
+        """, unsafe_allow_html=True)
 
-    current_ui_lang = st.selectbox("🌐 Interface Language", list(ui_languages.keys()), index=0)
+    st.markdown("---")
+
+    # Interface language at top
+    current_ui_lang = st.selectbox(
+        "🌐 Interface Language",
+        list(ui_languages.keys()),
+        index=0,
+        key="ui_lang_select"
+    )
     t = ui_languages[current_ui_lang]
 
     st.markdown("---")
 
-    # Navigation
-    st.markdown("**Navigation**")
-    for pid, plabel in [("generate", t["nav_gen"]), ("tools", t["nav_tools"]), ("history", t["nav_hist"])]:
-        css = "nav-active" if st.session_state.page == pid else "nav-inactive"
-        st.markdown(f"<div class='{css}'>", unsafe_allow_html=True)
-        if st.button(plabel, key=f"nav_{pid}", use_container_width=True):
-            st.session_state.page = pid
-            st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
+    # ── LISTING LANGUAGE ──
+    st.markdown(f'<div class="sidebar-section">📝 Output Language</div>', unsafe_allow_html=True)
+    st.session_state.target_lang_input = st.text_input(
+        t["target_lang"],
+        value=st.session_state.target_lang_input,
+        label_visibility="collapsed",
+        placeholder="E.g., English, Français, Español, 日本語..."
+    )
 
-    st.markdown("---")
-    st.header(t["settings"])
+    # ── PROPERTY DETAILS ──
+    st.markdown(f'<div class="sidebar-section">🏠 Property Details</div>', unsafe_allow_html=True)
 
-    st.session_state.target_lang_input = st.text_input(t["target_lang"], value=st.session_state.target_lang_input)
-    st.session_state.prop_type = st.text_input(t["prop_type"], value=st.session_state.prop_type, placeholder=t["ph_prop"])
-    st.session_state.price = st.text_input(t["price"], value=st.session_state.price, placeholder=t["ph_price"])
-    st.session_state.location = st.text_input(t["location"], value=st.session_state.location, placeholder=t["ph_loc"])
+    st.session_state.prop_type = st.text_input(
+        t["prop_type"],
+        value=st.session_state.prop_type,
+        placeholder=t["ph_prop"]
+    )
+    st.session_state.price = st.text_input(
+        t["price"],
+        value=st.session_state.price,
+        placeholder=t["ph_price"]
+    )
+    st.session_state.location = st.text_input(
+        t["location"],
+        value=st.session_state.location,
+        placeholder=t["ph_loc"]
+    )
 
-    c1, c2 = st.columns(2)
-    with c1: st.session_state.beds = st.text_input(t["beds"], value=st.session_state.beds, placeholder=t["ph_beds"])
-    with c2: st.session_state.baths = st.text_input(t["baths"], value=st.session_state.baths, placeholder=t["ph_baths"])
-    c3, c4 = st.columns(2)
-    with c3: st.session_state.sqm = st.text_input(t["sqm"], value=st.session_state.sqm, placeholder=t["ph_sqm"])
-    with c4: st.session_state.year_built = st.text_input(t["year"], value=st.session_state.year_built, placeholder=t["ph_year"])
+    col_b, col_ba = st.columns(2)
+    with col_b:
+        st.session_state.bedrooms = st.text_input(
+            t["bedrooms"],
+            value=st.session_state.bedrooms,
+            placeholder=t["ph_beds"]
+        )
+    with col_ba:
+        st.session_state.bathrooms = st.text_input(
+            t["bathrooms"],
+            value=st.session_state.bathrooms,
+            placeholder=t["ph_baths"]
+        )
 
-    st.session_state.parking = st.text_input(t["parking"], value=st.session_state.parking, placeholder=t["ph_park"])
-    st.session_state.amenities = st.text_input(t["amenities"], value=st.session_state.amenities, placeholder=t["ph_amen"])
+    col_a, col_y = st.columns(2)
+    with col_a:
+        st.session_state.area = st.text_input(
+            t["area"],
+            value=st.session_state.area,
+            placeholder=t["ph_area"]
+        )
+    with col_y:
+        st.session_state.year_built = st.text_input(
+            t["year_built"],
+            value=st.session_state.year_built,
+            placeholder=t["ph_year"]
+        )
 
-    strats = t["tones"]
-    current_tone_idx = strats.index(st.session_state.tone) if st.session_state.tone in strats else 0
-    st.session_state.tone = st.selectbox(t["tone"], strats, index=current_tone_idx)
-    st.session_state.custom_inst = st.text_area(t["custom_inst"], value=st.session_state.custom_inst, placeholder=t["custom_inst_ph"])
+    furnishing_sel = st.selectbox(
+        t["furnishing"],
+        t["furnishing_opts"],
+        index=st.session_state.furnishing_idx
+    )
+    st.session_state.furnishing_idx = t["furnishing_opts"].index(furnishing_sel)
 
-    st.markdown("---")
-    st.subheader(t["agent_section"])
-    st.session_state.agent_name = st.text_input(t["agent_name"], value=st.session_state.agent_name, placeholder=t["ph_an"])
-    st.session_state.agent_co = st.text_input(t["agent_co"], value=st.session_state.agent_co, placeholder=t["ph_ac"])
-    st.session_state.agent_phone = st.text_input(t["agent_phone"], value=st.session_state.agent_phone, placeholder=t["ph_ap"])
-    st.session_state.agent_email = st.text_input(t["agent_email"], value=st.session_state.agent_email, placeholder=t["ph_ae"])
+    # ── MARKETING SETTINGS ──
+    st.markdown(f'<div class="sidebar-section">🎯 Marketing Settings</div>', unsafe_allow_html=True)
+
+    current_tone_idx = t["tones"].index(st.session_state.tone) if st.session_state.tone in t["tones"] else 0
+    st.session_state.tone = st.selectbox(
+        t["tone"],
+        t["tones"],
+        index=current_tone_idx
+    )
+
+    audience_sel = st.selectbox(
+        t["target_audience"],
+        t["audience_opts"],
+        index=st.session_state.audience_idx
+    )
+    st.session_state.audience_idx = t["audience_opts"].index(audience_sel)
+
+    # ── SPECIAL NOTES ──
+    st.markdown(f'<div class="sidebar-section">✨ Extra Details</div>', unsafe_allow_html=True)
+    st.session_state.custom_inst = st.text_area(
+        t["custom_inst"],
+        value=st.session_state.custom_inst,
+        placeholder=t["custom_inst_ph"],
+        height=110,
+        label_visibility="collapsed"
+    )
+
+    # Pro tip
+    st.markdown(f"""
+    <div class="pro-tip-box">
+        {t['pro_tip']}: {t['pro_tip_text']}
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # Clear all button
+    if st.button(t["clear_btn"], use_container_width=True):
+        for key in ["generated_content", "prop_type", "price", "location", "custom_inst",
+                    "bedrooms", "bathrooms", "area", "year_built"]:
+            st.session_state[key] = ""
+        st.session_state.furnishing_idx = 0
+        st.session_state.audience_idx = 0
+        st.rerun()
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# PAGE: GENERATE
-# ═══════════════════════════════════════════════════════════════════════════════
-if st.session_state.page == "generate":
+# ─────────────────────────────────────────────
+# MAIN CONTENT
+# ─────────────────────────────────────────────
+t = ui_languages[st.session_state.get("ui_lang_select", "English")]
 
-    st.markdown(f"<h1>🏢 {t['title']}</h1>", unsafe_allow_html=True)
-    st.markdown(f"<p style='text-align:center; color:#0f172a; font-weight:700; font-size:1.3rem; letter-spacing:0.3px; margin-bottom:5px;'>{t['service_desc']}</p>", unsafe_allow_html=True)
-    st.markdown(f"<div style='text-align:center; color:#64748b; font-size:1rem; max-width:800px; margin: 0 auto 2rem auto; line-height:1.6;'>{t['subtitle']}</div>", unsafe_allow_html=True)
+# ── HEADER ──
+feature_chips = "".join([
+    f'<span class="sarsa-feature-chip">✓ {f}</span>'
+    for f in t["features"]
+])
 
-    uploaded_files = st.file_uploader(t["upload_label"], type=["jpg","png","webp","jpeg"], accept_multiple_files=True)
+st.markdown(f"""
+<div class="sarsa-header">
+    <div style="position:relative; z-index:1;">
+        <div class="sarsa-subtitle-tag">AI-POWERED · REAL ESTATE</div>
+        <h1 class="sarsa-title">🏢 {t['title']}</h1>
+        <p class="sarsa-desc">{t['subtitle']}</p>
+        <div class="sarsa-features">{feature_chips}</div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
-    if uploaded_files:
-        images_for_ai = [Image.open(f) for f in uploaded_files]
-        cols = st.columns(min(len(images_for_ai), 4))
-        for i, img in enumerate(images_for_ai):
-            with cols[i % 4]:
-                st.image(img, use_container_width=True)
+# ── CONTENT AREA ──
+st.markdown('<div class="content-wrapper">', unsafe_allow_html=True)
 
-        st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
+# ── FILE UPLOADER ──
+uploaded_files = st.file_uploader(
+    t["upload_label"],
+    type=["jpg", "png", "webp", "jpeg"],
+    accept_multiple_files=True,
+    help=t["upload_hint"]
+)
 
-        if st.button(t["btn"], use_container_width=True):
-            strategy = st.session_state.tone or t["tones"][0]
-            prompt = build_prompt(st.session_state.target_lang_input or "English", strategy)
-            prog = st.progress(0)
-            status = st.empty()
-            loading_steps = [
-                "🔍 Analyzing property photos…",
-                "✍️ Writing premium listing copy…",
-                "📱 Building social media kit…",
-                "🎬 Scripting the video…",
-                "⚙️ Compiling technical specs…",
-                "📧 Drafting email templates…",
-                "🔍 Building SEO pack…",
-                "✅ Finalizing your package…",
-            ]
+if uploaded_files:
+    # Photo gallery
+    n = len(uploaded_files)
+    images_for_ai = [Image.open(f) for f in uploaded_files]
+
+    st.markdown(f"""
+    <div class="gallery-wrapper">
+        <div class="gallery-badge">📷 <span>{n} {t['photos_uploaded']}</span></div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    cols_per_row = min(n, 5)
+    cols = st.columns(cols_per_row)
+    for i, img in enumerate(images_for_ai):
+        with cols[i % cols_per_row]:
+            st.image(img, use_container_width=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── GENERATE BUTTON ──
+    gen_btn = st.button(t["btn"], use_container_width=True)
+
+    if gen_btn:
+        # Build context string
+        prop_details = []
+        if st.session_state.prop_type:
+            prop_details.append(f"Property Type: {st.session_state.prop_type}")
+        if st.session_state.location:
+            prop_details.append(f"Location: {st.session_state.location}")
+        if st.session_state.price:
+            prop_details.append(f"Price: {st.session_state.price}")
+        if st.session_state.bedrooms:
+            prop_details.append(f"Bedrooms: {st.session_state.bedrooms}")
+        if st.session_state.bathrooms:
+            prop_details.append(f"Bathrooms: {st.session_state.bathrooms}")
+        if st.session_state.area:
+            prop_details.append(f"Area: {st.session_state.area}")
+        if st.session_state.year_built:
+            prop_details.append(f"Year Built: {st.session_state.year_built}")
+        if furnishing_sel and furnishing_sel != t["furnishing_opts"][0]:
+            prop_details.append(f"Furnishing: {furnishing_sel}")
+        if audience_sel and audience_sel != t["audience_opts"][0]:
+            prop_details.append(f"Target Audience: {audience_sel}")
+        if st.session_state.custom_inst:
+            prop_details.append(f"Special Features: {st.session_state.custom_inst}")
+
+        prop_context = "\n".join(prop_details) if prop_details else "Property details to be determined from images"
+
+        expert_prompt = f"""You are a world-class Senior Real Estate Strategist and Marketing Expert for SarSa AI — a global property intelligence platform used by elite real estate agents worldwide.
+
+OUTPUT LANGUAGE: {st.session_state.target_lang_input}. Write ALL output content in this language only.
+
+PROPERTY INFORMATION:
+{prop_context}
+Marketing Strategy: {st.session_state.tone}
+
+CRITICAL INSTRUCTIONS:
+- Analyze the uploaded property photos deeply and extract ALL visible features, architectural details, quality indicators, finishes, and selling points
+- Write with extreme professionalism and emotional intelligence appropriate for the target market
+- Every section must be complete, detailed, and immediately usable by a real estate professional
+- Output exactly in the section format below — no extra commentary
+
+## SECTION_1 — PRIME LISTING (Sales Copy)
+[Write a compelling, emotionally resonant property listing. Include:
+• Powerful headline
+• 3-4 paragraph narrative description with vivid language that paints a lifestyle picture
+• Bullet-pointed key features list (min. 10 items)
+• Neighborhood/area highlights
+• Investment or lifestyle value proposition
+• Professional closing statement with call-to-action
+Minimum 600 words]
+
+## SECTION_2 — SOCIAL MEDIA KIT
+[Create platform-optimized content:
+• INSTAGRAM (3 posts) - Each with visual direction, caption (150-200 words), and 20+ targeted hashtags
+• FACEBOOK (2 posts) - Longer community-focused posts (200-250 words each)
+• LINKEDIN (1 post) - Professional investment-angle post (200 words)
+• TWITTER/X (3 tweets) - Punchy, engaging, each under 280 characters
+• TIKTOK/REELS (1 video hook) - Opening 3-second hook + 15-second script]
+
+## SECTION_3 — CINEMATIC VIDEO SCRIPT
+[Create a complete professional video script:
+• Title & Production Notes (duration, music mood, voiceover style)
+• Shot-by-shot breakdown with VISUAL description + VOICEOVER text for each shot
+• Min. 8 scenes covering: drone exterior, entrance, key rooms, outdoor areas, neighborhood, lifestyle ending
+• Music direction and pacing notes
+• Total script: 1:30–2:30 minute runtime
+Minimum 500 words]
+
+## SECTION_4 — TECHNICAL SPECIFICATIONS
+[Comprehensive property data sheet:
+• Full property specifications table (type, size, rooms, year, etc.)
+• Construction & materials analysis (based on visible features in photos)
+• Smart home & technology features
+• Energy efficiency notes
+• Nearby amenities & infrastructure
+• Legal & ownership notes (general)
+• Investment metrics (if applicable: rental yield estimate, market comparables notes)
+• Viewing & contact instructions template]
+
+## SECTION_5 — EMAIL CAMPAIGN
+[Create 2 professional email templates:
+EMAIL 1 - "New Listing Alert" (for subscriber list): Subject line + full body (300 words)
+EMAIL 2 - "Personal Introduction" (for individual prospect): Subject line + full body (250 words)
+Both should have professional structure: greeting, property intro, key highlights, CTA, signature block]
+
+## SECTION_6 — SEO & WEB COPY
+[Digital marketing content:
+• SEO-optimized webpage title and meta description (160 chars)
+• 5 targeted keywords with search intent analysis
+• H1, H2, H3 heading structure suggestion
+• 400-word SEO web description (naturally incorporating keywords)
+• Google Ads headline suggestions (5 headlines, 30 chars each)
+• Google Ads description (2 versions, 90 chars each)
+• Schema markup property type suggestion]"""
+
+        with st.spinner(t["loading"]):
             try:
-                for i, step in enumerate(loading_steps[:-1]):
-                    status.info(step)
-                    prog.progress(int((i + 1) / len(loading_steps) * 88))
-                status.info(loading_steps[-1])
-                response = model.generate_content([prompt] + images_for_ai)
-                raw = response.text
-                st.session_state.uretilen_ilan = raw
-                for n in range(1, 7):
-                    st.session_state[f"s{n}"] = extract_section(raw, n)
-                st.session_state.output_ready = True
-                prog.progress(100)
-                status.success("✅ Your marketing package is ready!")
-            except Exception as e:
-                status.error(f"{t['error']} {e}")
-                prog.empty()
-
-    else:
-        if not st.session_state.output_ready:
-            st.markdown(f"""
-            <div class='sarsa-empty'>
-                <div class='sarsa-empty-icon'>🏡</div>
-                <div class='sarsa-empty-title'>{t['empty_title'] if 'empty_title' in t else t['empty']}</div>
-                <div class='sarsa-empty-sub'>Upload property photos · Fill in the details · Hit Generate</div>
-            </div>""", unsafe_allow_html=True)
-
-    # OUTPUT
-    if st.session_state.output_ready:
-        st.markdown("<div class='sarsa-divider'></div>", unsafe_allow_html=True)
-
-        # Result header row
-        rc1, rc2, rc3, rc4 = st.columns([3, 1.2, 1.2, 1.4])
-        with rc1:
-            st.markdown(f"<div class='sarsa-result-title'>{t['result']}</div>", unsafe_allow_html=True)
-        with rc2:
-            if st.button(t["save_btn"], use_container_width=True, key="save_main"):
-                save_to_history()
-                st.success(t["saved_msg"])
-        with rc3:
-            if st.button(t["regen"], use_container_width=True, key="regen_main"):
-                for k in ["s1","s2","s3","s4","s5","s6","uretilen_ilan"]:
-                    st.session_state[k] = ""
-                st.session_state.output_ready = False
+                response = model.generate_content([expert_prompt] + images_for_ai)
+                st.session_state.generated_content = response.text
+                # Save to history
+                hist_entry = {
+                    "timestamp": datetime.now().strftime("%H:%M"),
+                    "prop_type": st.session_state.prop_type or "Property",
+                    "location": st.session_state.location or "—",
+                }
+                st.session_state.generation_history.insert(0, hist_entry)
+                if len(st.session_state.generation_history) > 5:
+                    st.session_state.generation_history = st.session_state.generation_history[:5]
                 st.rerun()
-        with rc4:
-            st.download_button(t["download"], data=full_export(),
-                file_name=f"sarsa_full_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
-                key="dl_full", use_container_width=True)
+            except Exception as e:
+                st.error(f"{t['error']} {str(e)}")
 
-        st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
+    # ── RESULTS ──
+    if st.session_state.generated_content:
+        raw = st.session_state.generated_content
+        sections = {}
+        parts = raw.split("##")
+        for p in parts:
+            p = p.strip()
+            for i in range(1, 7):
+                key = f"SECTION_{i}"
+                if p.startswith(key):
+                    content = p[len(key):].strip()
+                    if content.startswith("—"):
+                        content = content[1:].strip()
+                    content = content.lstrip("-–— \n")
+                    sections[i] = content
+                    break
+
+        def get_sec(n):
+            return sections.get(n, "")
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        prop_slug = (st.session_state.prop_type or "property").replace(" ", "_")[:20].lower()
+        filename = f"sarsa_ai_{prop_slug}_{timestamp}.txt"
+
+        all_export = f"""SARSA AI — COMPLETE MARKETING ASSETS
+Generated: {datetime.now().strftime("%B %d, %Y at %H:%M")}
+Property: {st.session_state.prop_type or 'N/A'}
+Location: {st.session_state.location or 'N/A'}
+Language: {st.session_state.target_lang_input}
+Strategy: {st.session_state.tone}
+{'='*60}
+
+PRIME LISTING
+{'='*60}
+{get_sec(1)}
+
+SOCIAL MEDIA KIT
+{'='*60}
+{get_sec(2)}
+
+VIDEO SCRIPT
+{'='*60}
+{get_sec(3)}
+
+TECHNICAL SPECIFICATIONS
+{'='*60}
+{get_sec(4)}
+
+EMAIL CAMPAIGN
+{'='*60}
+{get_sec(5)}
+
+SEO & WEB COPY
+{'='*60}
+{get_sec(6)}
+"""
+
+        st.markdown(f"""
+        <div class="result-panel">
+          <div class="result-panel-header">
+            <div>
+              <div class="result-panel-title">{t['result']}</div>
+              <div class="result-panel-subtitle">
+                {st.session_state.prop_type or '—'} · {st.session_state.location or '—'} · {st.session_state.tone}
+              </div>
+            </div>
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
 
         tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-            t["tab1"], t["tab2"], t["tab3"], t["tab4"], t["tab5"], t["tab6"]])
-        with tab1: render_section("s1", "listing",   show_fhc=True)
-        with tab2: render_section("s2", "social")
-        with tab3: render_section("s3", "video")
-        with tab4: render_section("s4", "techspecs")
-        with tab5: render_section("s5", "emails")
-        with tab6: render_section("s6", "seo")
+            f"📝 {t['tab_main']}",
+            f"📱 {t['tab_social']}",
+            f"🎬 {t['tab_video']}",
+            f"⚙️ {t['tab_tech']}",
+            f"✉️ {t['tab_email']}",
+            f"🔍 {t['tab_seo']}"
+        ])
 
+        def tab_content(label, section_num, key_suffix):
+            sec_content = get_sec(section_num)
+            updated = st.text_area(
+                label,
+                value=sec_content,
+                height=420,
+                key=f"txt_{key_suffix}",
+                label_visibility="collapsed"
+            )
+            col_s, col_d = st.columns([1, 1])
+            with col_s:
+                if st.button(t["save_btn"], key=f"save_{key_suffix}", use_container_width=True):
+                    sections[section_num] = updated
+                    combined = raw
+                    st.success(t["saved_msg"])
+            with col_d:
+                st.download_button(
+                    t["download_tab"],
+                    data=updated,
+                    file_name=f"sarsa_{key_suffix}_{timestamp}.txt",
+                    key=f"dl_{key_suffix}",
+                    use_container_width=True
+                )
+            return updated
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# PAGE: AGENT TOOLS
-# ═══════════════════════════════════════════════════════════════════════════════
-elif st.session_state.page == "tools":
+        with tab1:
+            tab_content(t["label_main"], 1, "listing")
+        with tab2:
+            tab_content(t["label_social"], 2, "social")
+        with tab3:
+            tab_content(t["label_video"], 3, "video")
+        with tab4:
+            tab_content(t["label_tech"], 4, "tech")
+        with tab5:
+            tab_content(t["label_email"], 5, "email")
+        with tab6:
+            tab_content(t["label_seo"], 6, "seo")
 
-    st.markdown(f"<h1>{t['tools_title']}</h1>", unsafe_allow_html=True)
-    st.markdown(f"<p style='text-align:center; color:#64748b; margin-bottom:1.5rem;'>{t['tools_sub']}</p>", unsafe_allow_html=True)
+        st.markdown("---")
+        col_exp1, col_exp2 = st.columns([2, 1])
+        with col_exp1:
+            st.download_button(
+                label=t["download_all"],
+                data=all_export,
+                file_name=filename,
+                mime="text/plain",
+                use_container_width=True
+            )
+        with col_exp2:
+            if st.session_state.generation_history:
+                last = st.session_state.generation_history[0]
+                st.markdown(f"""
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px;
+                            padding:0.7rem 1rem; font-size:0.78rem; color:#64748b; text-align:center;">
+                    ⏱ Last generated: <strong>{last['timestamp']}</strong>
+                </div>
+                """, unsafe_allow_html=True)
 
-    ss = st.session_state
-    lang  = ss.target_lang_input or "English"
-    name  = ss.agent_name  or "the agent"
-    co    = ss.agent_co    or "the agency"
-    loc   = ss.location    or "the local market"
-    prop  = ss.prop_type   or "residential property"
-    price = ss.price       or "market price"
-    beds  = ss.beds        or "N/A"
-    sqm   = ss.sqm         or "N/A"
-    phone = ss.agent_phone or "phone not provided"
-    email = ss.agent_email or "email not provided"
-    today = datetime.now().strftime("%B %d, %Y")
+else:
+    # ── EMPTY STATE ──
+    st.markdown(f"""
+    <div class="result-panel" style="border:2px dashed #e2e8f0; box-shadow:none;">
+        <div class="empty-state">
+            <div class="empty-state-icon">🏘️</div>
+            <div class="empty-state-title">{t['empty_title']}</div>
+            <div class="empty-state-sub">{t['empty_sub']}</div>
+            <br>
+            <div style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin-top:0.5rem;">
+                {''.join([f"<span style='background:#f1f5f9; color:#475569; font-size:0.75rem; font-weight:500; padding:5px 12px; border-radius:20px; border:1px solid #e2e8f0;'>✓ {f}</span>" for f in t['features']])}
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-    TOOLS = [
-        ("objection","💬 Objection Handler",
-         "Master responses to the 10 toughest client objections using FEEL-FELT-FOUND",
-         f"You are the world's top real estate sales coach.\nWrite a COMPLETE OBJECTION HANDLING PLAYBOOK.\nAgent: {name} | Agency: {co} | Market: {loc}\nLanguage: {lang}\n\nHandle these 10 objections using FEEL-FELT-FOUND + confident closing line:\n1. 'Your commission is too high'\n2. 'I'll wait for the market to improve'\n3. 'I can sell it myself (FSBO)'\n4. 'Another agent offered a lower fee'\n5. 'The asking price is too high'\n6. 'I need more time to think'\n7. 'We're not in a rush to sell'\n8. 'The property needs too much work'\n9. 'I'm already talking to another agent'\n10. 'I want to try selling privately first'\n\nFormat each: **Bold objection** → FEEL → FELT → FOUND → CLOSING LINE."),
-        ("cma","📊 CMA Report Template",
-         "Professional comparative market analysis for seller presentations",
-         f"Write a COMPARATIVE MARKET ANALYSIS REPORT.\nProperty: {prop} | Location: {loc} | Price: {price}\nPrepared by: {name} | {co}\nLanguage: {lang}\n\nSections: Executive Summary, Subject Property Profile, Market Conditions, 3 Comparable Sales, Price Analysis, Recommended Price, DOM Forecast, Marketing Strategy, Agent Opinion of Value, Disclaimer."),
-        ("cold_email","📧 Cold Outreach Emails",
-         "Three high-converting prospecting emails for sellers, landlords & expired listings",
-         f"Write 3 cold outreach emails.\nAgent: {name} | Agency: {co} | Phone: {phone} | Email: {email}\nTarget area: {loc}\nLanguage: {lang}\n\nEMAIL 1 — POTENTIAL SELLER: Subject + 150-word warm body + signature\nEMAIL 2 — LANDLORD/INVESTOR: Subject + 150-word ROI-angle body + signature\nEMAIL 3 — EXPIRED LISTING: Subject + 130-word empathy + fresh-approach body + signature"),
-        ("negotiation","🤝 Negotiation Scripts",
-         "Word-for-word scripts for every negotiation scenario agents face",
-         f"Write a REAL ESTATE NEGOTIATION SCRIPT PLAYBOOK.\nProperty: {prop} | Location: {loc} | Price: {price}\nAgent: {name} | {co}\nLanguage: {lang}\n\n6 scenarios with Opening Line, 3 Talking Points, Counter Proposal, What NOT to Say, Closing Line:\n1. Responding to a lowball offer\n2. Multiple offers — create urgency\n3. Buyer requests price reduction after inspection\n4. Buyer requests seller pays closing costs\n5. Request to extend closing date\n6. Deal falling apart — save it"),
-        ("bio","👤 Agent Biography",
-         "Three professional bios: 55-word micro, 160-word standard, 320-word full",
-         f"Write 3 professional real estate agent biographies.\nAgent: {name} | Agency: {co} | Market: {loc}\nPhone: {phone} | Email: {email}\nLanguage: {lang}\n\nVERSION 1 — MICRO (55 words): 1st person, for Instagram/business cards\nVERSION 2 — STANDARD (160 words): 3rd person, for website/LinkedIn\nVERSION 3 — FULL (320 words): 3rd person, press/media, include awards placeholder"),
-        ("openhouse","🏠 Open House Event Guide",
-         "Complete prep checklist, welcome scripts, tour points & same-day follow-ups",
-         f"Write a COMPLETE OPEN HOUSE EVENT GUIDE.\nProperty: {prop} | Location: {loc} | Price: {price} | Beds: {beds} | Size: {sqm} m²\nAgent: {name} | Phone: {phone}\nLanguage: {lang}\n\nInclude: Pre-event checklist (12 tasks), Welcome scripts (45 sec + 2 min), Room-by-room tour (8 rooms), Top 6 selling points, 4 price objection responses, Sign-in opener, 5 qualifying questions, Same-day SMS (155 chars), Same-day WhatsApp, Next-day email"),
-        ("followup","📞 14-Day Follow-Up Sequence",
-         "Complete multi-channel follow-up with every message written out in full",
-         f"Write a COMPLETE 14-DAY POST-VIEWING FOLLOW-UP SEQUENCE.\nProperty: {prop} | Location: {loc} | Price: {price}\nAgent: {name} | Phone: {phone} | Email: {email}\nLanguage: {lang}\n\nDay 0: SMS (155 chars) + WhatsApp (200 chars)\nDay 1: Email 150-word warm recap\nDay 3: Email 130-word neighbourhood highlights\nDay 5: SMS check-in\nDay 7: Email 120-word market update\nDay 10: Phone call outline (2-min, 6 points)\nDay 14: Email 100-word final opportunity"),
-        ("investment","💰 Investment Analysis Memo",
-         "Full ROI, yield and cash flow analysis for investor presentations",
-         f"Write a REAL ESTATE INVESTMENT ANALYSIS MEMO.\nProperty: {prop} | Location: {loc} | Price: {price} | Size: {sqm} m²\nPrepared by: {name} | {co}\nLanguage: {lang}\n\nInclude: Snapshot, Acquisition Costs, Rental Income (Airbnb vs long-term), Gross Yield, NOI, Cap Rate, Cash-on-Cash Return, 5-Year Appreciation (3 scenarios), Break-Even, 3 Exit Strategies, 5 Risk Factors, Verdict, Disclaimer."),
-        ("checklist","✅ Transaction Checklists",
-         "Complete step-by-step buyer and seller transaction checklists (70+ tasks)",
-         f"Create REAL ESTATE TRANSACTION CHECKLISTS.\nAgent: {name} | Agency: {co}\nLanguage: {lang}\n\nSELLER CHECKLIST (36+ tasks, 6 phases): Pre-Listing, Active Listing, Offer & Negotiation, Under Contract, Pre-Closing, Closing Day\nBUYER CHECKLIST (33+ tasks, 6 phases): Pre-Search, Property Search, Making Offer, Under Contract, Financing & Inspection, Closing & Moving\nFormat: ☐ Task | Responsible | Notes"),
-        ("neighborhood","🗺️ Neighbourhood Guide",
-         "Comprehensive buyer's area guide that overcomes location hesitation",
-         f"Write a NEIGHBOURHOOD GUIDE FOR BUYERS.\nArea: {loc} | Property: {prop} | Price: {price}\nPrepared by: {name} | {co}\nLanguage: {lang}\n\n10 sections: Area Character, Transport, Schools, Dining/Shopping, Parks, Healthcare, Safety, Property Market, 5 Reasons Locals Love It, Future Growth + Agent Recommendation + Disclaimer."),
-        ("press","📰 Press Releases",
-         "Two AP-style press releases: property launch and market update",
-         f"Write 2 AP-style press releases.\nAgency: {co} | Agent: {name} | Phone: {phone} | Email: {email}\nProperty: {prop} | Location: {loc} | Price: {price} | Date: {today}\nLanguage: {lang}\n\nPR 1 — PROPERTY LAUNCH: FOR IMMEDIATE RELEASE, headline, subheading, dateline, lead, 2 property paragraphs, market context, agent quote, boilerplate, ###, media contact\nPR 2 — MARKET UPDATE: Same structure, market commentary. Both 380–420 words."),
-        ("mortgage","🏦 Buyer's Finance Guide",
-         "Complete mortgage guide: types, costs, application steps and glossary",
-         f"Write a BUYER'S FINANCE AND MORTGAGE GUIDE.\nMarket: {loc}\nPrepared by: {name} | {co}\nLanguage: {lang}\n\n12 sections: Why Finance Planning Matters, Borrowing Capacity, Deposit Requirements, Mortgage Types (comparison table), Complete Buying Costs, Application Process (8 steps), Common Rejection Reasons, First-Time Buyer Advantages, Investor Mortgages, Remortgaging, Glossary (18 terms), Next Steps & Disclaimer."),
-    ]
-
-    # Show existing output
-    if ss.tool_out:
-        st.markdown(f"<div style='background:#f1f5f9;border-radius:10px;padding:0.7rem 1rem;margin-bottom:1rem;font-weight:700;color:#0f172a;'>📄 {ss.tool_title}</div>", unsafe_allow_html=True)
-        edited = st.text_area("", value=ss.tool_out, height=500, key="tool_ta", label_visibility="collapsed")
-        w = len(edited.split()) if edited else 0
-        c = len(edited) if edited else 0
-        st.markdown(f"<div class='sarsa-chips'><span class='sarsa-chip'>📊 {w} {t['words']}</span><span class='sarsa-chip'>✏️ {c} {t['chars']}</span></div>", unsafe_allow_html=True)
-        tc1, tc2, tc3 = st.columns(3)
-        with tc1:
-            st.download_button(t["dl_section"], data=edited,
-                file_name=f"sarsa_tool_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
-                key="tool_dl", use_container_width=True)
-        with tc2:
-            copy_btn(edited, t["copy_btn"], t["copied"], "tool_main")
-        with tc3:
-            if st.button(t["tool_clear"], use_container_width=True, key="tool_clear"):
-                ss.tool_out = ""; ss.tool_title = ""
-                st.rerun()
-        st.markdown("<div class='sarsa-divider'></div>", unsafe_allow_html=True)
-
-    for i in range(0, len(TOOLS), 2):
-        cols = st.columns(2)
-        for j, col in enumerate(cols):
-            idx = i + j
-            if idx >= len(TOOLS): break
-            tid, tname, tdesc, tprompt = TOOLS[idx]
-            with col:
-                st.markdown(f"<div class='sarsa-tool-card'><div class='sarsa-tool-name'>{tname}</div><div class='sarsa-tool-desc'>{tdesc}</div></div>", unsafe_allow_html=True)
-                if st.button(t["tool_run"], key=f"tool_{tid}", use_container_width=True):
-                    with st.spinner(f"✨ {tname}…"):
-                        try:
-                            r = model.generate_content(tprompt)
-                            ss.tool_out = r.text; ss.tool_title = tname
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"{t['error']} {e}")
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# PAGE: HISTORY
-# ═══════════════════════════════════════════════════════════════════════════════
-elif st.session_state.page == "history":
-
-    hist = st.session_state.get("history", [])
-    st.markdown(f"<h1>{t['hist_title']}</h1>", unsafe_allow_html=True)
-    st.markdown(f"<p style='text-align:center; color:#64748b; margin-bottom:1.5rem;'>{len(hist)} saved listing{'s' if len(hist) != 1 else ''}</p>", unsafe_allow_html=True)
-
-    if not hist:
-        st.markdown(f"""
-        <div class='sarsa-empty'>
-            <div class='sarsa-empty-icon'>📁</div>
-            <div class='sarsa-empty-title'>{t['hist_title']}</div>
-            <div class='sarsa-empty-sub'>{t['hist_empty']}</div>
-        </div>""", unsafe_allow_html=True)
-    else:
-        for i, entry in enumerate(hist):
-            label = f"🏢  {entry['prop']}  ·  {entry['loc']}  ·  {entry['price']}  ·  {entry['date']}"
-            with st.expander(label, expanded=(i == 0)):
-                h_tabs = st.tabs([t["tab1"], t["tab2"], t["tab3"], t["tab4"]])
-                for ni, ht in enumerate(h_tabs):
-                    with ht:
-                        st.text_area("", value=entry.get(f"s{ni+1}",""), height=250,
-                            key=f"hs{ni+1}_{i}", label_visibility="collapsed", disabled=True)
-                hc1, hc2, hc3 = st.columns(3)
-                with hc1:
-                    if st.button(t["hist_load"], key=f"hl_{i}", use_container_width=True):
-                        for n in range(1, 7):
-                            st.session_state[f"s{n}"] = entry.get(f"s{n}", "")
-                        st.session_state.output_ready = True
-                        st.session_state.page = "generate"
-                        st.rerun()
-                with hc2:
-                    exp = "\n\n".join(entry.get(f"s{n}","") for n in range(1,7))
-                    st.download_button(t["hist_dl"], data=exp,
-                        file_name=f"sarsa_history_{entry['id'][:8]}.txt",
-                        key=f"hd_{i}", use_container_width=True)
-                with hc3:
-                    if st.button(t["hist_del"], key=f"hdel_{i}", use_container_width=True):
-                        st.session_state.history.pop(i)
-                        st.rerun()
+st.markdown('</div>', unsafe_allow_html=True)
