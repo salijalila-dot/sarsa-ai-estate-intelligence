@@ -597,7 +597,7 @@ for key, val in [
         st.session_state[key] = val
 
 # ─── CSS ─────────────────────────────────────────────────────────────────────
-st.html("""
+st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 html, body, [class*="st-"] { font-family: 'Plus Jakarta Sans', sans-serif !important; }
@@ -638,19 +638,25 @@ h1 { color: #0f172a !important; font-weight: 800 !important; text-align: center;
 }
 [data-testid="stSidebarCollapseButton"] button svg { display: none !important; }
 
-/* ── Sidebar toggle button: CLOSED → click to open (⬅️) ── */
-/* Force entire collapsed control chain to be visible */
+/* ── Sidebar toggle button: CLOSED → click to open ── */
+/* Target every possible selector Streamlit uses across versions */
 [data-testid="stSidebarCollapsedControl"],
-[data-testid="stSidebarCollapsedControl"] > *,
-[data-testid="stSidebarCollapsedControl"] > * > * {
+div[data-testid="stSidebarCollapsedControl"],
+section[data-testid="stSidebarCollapsedControl"] {
     display: block !important;
     visibility: visible !important;
     opacity: 1 !important;
     pointer-events: auto !important;
-    position: relative !important;
     z-index: 999999 !important;
 }
-[data-testid="stSidebarCollapsedControl"] button {
+[data-testid="stSidebarCollapsedControl"] *,
+div[data-testid="stSidebarCollapsedControl"] * {
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+[data-testid="stSidebarCollapsedControl"] button,
+div[data-testid="stSidebarCollapsedControl"] button {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -671,12 +677,14 @@ h1 { color: #0f172a !important; font-weight: 800 !important; text-align: center;
     transition: all 0.2s ease !important;
     cursor: pointer !important;
 }
-[data-testid="stSidebarCollapsedControl"] button:hover {
+[data-testid="stSidebarCollapsedControl"] button:hover,
+div[data-testid="stSidebarCollapsedControl"] button:hover {
     background-color: #f1f5f9 !important;
     border-color: #0f172a !important;
     box-shadow: 0 4px 14px rgba(15,23,42,0.25) !important;
 }
-[data-testid="stSidebarCollapsedControl"] button svg { display: none !important; }
+[data-testid="stSidebarCollapsedControl"] button svg,
+div[data-testid="stSidebarCollapsedControl"] button svg { display: none !important; }
 
 [data-testid="stSidebar"] { background: #ffffff !important; border-right: 1px solid #e2e8f0 !important; }
 [data-testid="stSidebar"] label, [data-testid="stSidebar"] .stSelectbox label {
@@ -761,7 +769,7 @@ div[data-baseweb="select"], div[role="button"], .stSelectbox div { cursor: point
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 </style>
-""")
+""", unsafe_allow_html=True)
 
 
 # ─── SIDEBAR ─────────────────────────────────────────────────────────────────
