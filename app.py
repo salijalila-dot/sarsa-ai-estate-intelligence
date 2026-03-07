@@ -572,6 +572,18 @@ div[data-testid="stDecoration"] { display: none !important; }
 span[data-testid="stIconMaterial"] { 
     font-family: "Material Symbols Rounded", "Material Icons" !important; 
 }
+/* Sidebar kapatma butonunu her zaman görünür kıl */
+button[kind="headerNoPadding"] {
+    opacity: 1 !important;
+    visibility: visible !important;
+    display: block !important;
+}
+
+/* Sidebar açıkken butonun yerini sabitle ve tıklanabilirliğini koru */
+section[data-testid="stSidebar"] + div + button {
+    opacity: 1 !important;
+}
+
 
 .block-container {
     background: white; padding: 2.5rem 3rem !important;
