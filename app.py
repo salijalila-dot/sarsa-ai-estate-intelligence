@@ -569,7 +569,6 @@ html, body, [class*="st-"] { font-family: 'Plus Jakarta Sans', sans-serif !impor
 div[data-testid="stInputInstructions"] { display: none !important; }
 #MainMenu, footer { display: none !important; }
 div[data-testid="stDecoration"] { display: none !important; }
-span[data-testid="stIconMaterial"] { display: none !important; }
 
 .block-container {
     background: white; padding: 2.5rem 3rem !important;
