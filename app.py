@@ -693,17 +693,33 @@ if uploaded_files:
             p_aud = t["audience_opts"][st.session_state.audience_idx]
             details = f"Type: {st.session_state.prop_type}, Loc: {st.session_state.location}, Price: {st.session_state.price}, Beds: {st.session_state.bedrooms}, Baths: {st.session_state.bathrooms}, Area: {st.session_state.area_size}, Year: {st.session_state.year_built}, Furn: {p_furn}, Audience: {p_aud}, Tone: {st.session_state.tone}, Notes: {st.session_state.custom_inst}"
             
-            prompt = f"""Write ALL content in {st.session_state.target_lang_input}.
-            Generate 7 specific sections based on the uploaded photos and these details: {details}.
-            Structure each section with exactly ## SECTION_N headers.
+            prompt = f"""You are a world-class AI Real Estate Copywriter. Write ALL content in {st.session_state.target_lang_input}.
+            CRITICAL INSTRUCTION: You MUST write full, comprehensive content for ALL 7 sections. Do not skip or summarize any section, especially Sections 5 and 6. Provide the complete text.
+            
+            PROPERTY DETAILS: {details}
 
-            ## SECTION_1 — PRIME LISTING: Full professional listing (600 words).
-            ## SECTION_2 — SOCIAL MEDIA KIT: Instagram, Facebook, LinkedIn posts, TikTok/Reel script.
-            ## SECTION_3 — CINEMATIC VIDEO SCRIPT: 90-150s production script.
-            ## SECTION_4 — TECHNICAL SPECIFICATIONS: Professional data sheet, construction materials, investment analysis.
-            ## SECTION_5 — EMAIL CAMPAIGN: Three specific email templates (Alert, Pitch, Follow-up).
-            ## SECTION_6 — SEO & WEB COPY: SEO metadata, headings, keywords, Google Ads copy.
-            ## SECTION_7 — PHOTOGRAPHY RECOMMENDATIONS: Missing angles, lighting tips, and staging advice based on analyzed photos."""
+            Analyze the photos and use exactly these headers, writing the extensive content below each one:
+
+            ## SECTION_1
+            [Write the full PRIME LISTING here - minimum 600 words]
+
+            ## SECTION_2
+            [Write the complete SOCIAL MEDIA KIT here - Posts for IG, FB, LinkedIn, TikTok]
+
+            ## SECTION_3
+            [Write the full CINEMATIC VIDEO SCRIPT here]
+
+            ## SECTION_4
+            [Write the full TECHNICAL SPECIFICATIONS here]
+
+            ## SECTION_5
+            [Write the full EMAIL CAMPAIGN here - 3 complete email templates (Alert, Pitch, Follow-up)]
+
+            ## SECTION_6
+            [Write the full SEO & WEB COPY here - Metadata, keywords, Ads copy]
+
+            ## SECTION_7
+            [Write the full PHOTOGRAPHY RECOMMENDATIONS here - Missing angles, staging advice]"""
             
             try:
                 response = model.generate_content([prompt] + images_for_ai)
@@ -714,14 +730,18 @@ if uploaded_files:
     if st.session_state.uretilen_ilan:
         raw = st.session_state.uretilen_ilan
         sec = {str(i): "" for i in range(1, 8)}
-        # Improved parsing logic
-        chunks = raw.split("##")
-        for chunk in chunks:
-            chunk = chunk.strip()
+        
+        # Extremely robust parsing logic to prevent skipped lines
+        for p in raw.split("##"):
+            p = p.strip()
             for n in ["1", "2", "3", "4", "5", "6", "7"]:
-                if chunk.upper().startswith(f"SECTION_{n}"):
-                    content = chunk.split("\n", 1)[-1] if "\n" in chunk else chunk
-                    sec[n] = content.strip()
+                if p.upper().startswith(f"SECTION_{n}"):
+                    content = p[len(f"SECTION_{n}"):].strip()
+                    # Clean up if AI left a dash or title on the same line
+                    if content.startswith("—") or content.startswith("-") or content.startswith(":"):
+                        content = content.lstrip("—-–: \n").strip()
+                    sec[n] = content
+                    break
 
         tabs = st.tabs([f"📝 {t['tab_main']}", f"📱 {t['tab_social']}", f"🎬 {t['tab_video']}", f"⚙️ {t['tab_tech']}", f"✉️ {t['tab_email']}", f"🔍 {t['tab_seo']}", f"📸 {t['tab_photo']}"])
         labels = [t["label_main"], t["label_social"], t["label_video"], t["label_tech"], t["label_email"], t["label_seo"], t["label_photo"]]
