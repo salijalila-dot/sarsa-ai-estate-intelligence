@@ -63,6 +63,10 @@ ui_languages = {
         "save_btn": "Save Changes",
         "saved_msg": "Saved!",
         "error": "Error:",
+        "err_connection": "Connection Error: Could not reach the AI service. Please check your internet connection and try again.",
+        "err_quota": "API Quota Exceeded: The service is temporarily at capacity. Please wait a moment and try again.",
+        "err_image": "Image Error: One or more photos could not be processed. Please ensure images are clear JPG/PNG/WEBP files.",
+        "err_generic": "An unexpected error occurred. Please try again or contact support if the issue persists.",
         "clear_btn": "Reset Form",
         "tab_main": "Prime Listing",
         "tab_social": "Social Media Kit",
@@ -121,6 +125,10 @@ ui_languages = {
         "save_btn": "Kaydet",
         "saved_msg": "Kaydedildi!",
         "error": "Hata:",
+        "err_connection": "Baglanti Hatasi: AI servisine ulasilamadi. Internet baglantinizi kontrol edin ve tekrar deneyin.",
+        "err_quota": "API Kotasi Asildi: Servis gecici olarak kapasitede. Lutfen bir sure bekleyin ve tekrar deneyin.",
+        "err_image": "Gorsel Hatasi: Fotograflar islenemedi. Lutfen net JPG/PNG/WEBP dosyalari kullanin.",
+        "err_generic": "Beklenmedik bir hata olustu. Tekrar deneyin veya destek ile iletisime gecin.",
         "clear_btn": "Formu Temizle",
         "tab_main": "Ana Ilan",
         "tab_social": "Sosyal Medya Kiti",
@@ -179,6 +187,10 @@ ui_languages = {
         "save_btn": "Guardar Cambios",
         "saved_msg": "Guardado!",
         "error": "Error:",
+        "err_connection": "Error de Conexion: No se pudo conectar al servicio de IA. Verifique su conexion.",
+        "err_quota": "Cuota Excedida: El servicio esta saturado. Espere un momento e intente de nuevo.",
+        "err_image": "Error de Imagen: Las fotos no pudieron procesarse. Use archivos JPG/PNG/WEBP claros.",
+        "err_generic": "Ocurrio un error inesperado. Intentelo de nuevo o contacte soporte.",
         "clear_btn": "Limpiar Formulario",
         "tab_main": "Anuncio Premium",
         "tab_social": "Kit de Redes Sociales",
@@ -237,6 +249,10 @@ ui_languages = {
         "save_btn": "Speichern",
         "saved_msg": "Gespeichert!",
         "error": "Fehler:",
+        "err_connection": "Verbindungsfehler: KI-Dienst nicht erreichbar. Pruefen Sie Ihre Internetverbindung.",
+        "err_quota": "Kontingent erschoepft: Dienst vorubergehend ausgelastet. Bitte warten und erneut versuchen.",
+        "err_image": "Bildfehler: Fotos konnten nicht verarbeitet werden. Bitte JPG/PNG/WEBP-Dateien verwenden.",
+        "err_generic": "Unerwarteter Fehler. Bitte erneut versuchen oder Support kontaktieren.",
         "clear_btn": "Formular Zuruecksetzen",
         "tab_main": "Premium-Expose",
         "tab_social": "Social Media Kit",
@@ -295,6 +311,10 @@ ui_languages = {
         "save_btn": "Enregistrer",
         "saved_msg": "Enregistre!",
         "error": "Erreur:",
+        "err_connection": "Erreur de Connexion: Service IA inaccessible. Verifiez votre connexion internet.",
+        "err_quota": "Quota Depasse: Service temporairement sature. Veuillez patienter et reessayer.",
+        "err_image": "Erreur d'Image: Photos non traitables. Utilisez des fichiers JPG/PNG/WEBP clairs.",
+        "err_generic": "Erreur inattendue. Reessayez ou contactez le support.",
         "clear_btn": "Reinitialiser",
         "tab_main": "Annonce Premium",
         "tab_social": "Kit Reseaux Sociaux",
@@ -353,6 +373,10 @@ ui_languages = {
         "save_btn": "Salvar Alteracoes",
         "saved_msg": "Salvo!",
         "error": "Erro:",
+        "err_connection": "Erro de Conexao: Servico de IA inacessivel. Verifique sua conexao com a internet.",
+        "err_quota": "Cota Excedida: Servico temporariamente sobrecarregado. Aguarde e tente novamente.",
+        "err_image": "Erro de Imagem: Fotos nao puderam ser processadas. Use arquivos JPG/PNG/WEBP claros.",
+        "err_generic": "Erro inesperado. Tente novamente ou entre em contato com o suporte.",
         "clear_btn": "Limpar Formulario",
         "tab_main": "Anuncio Premium",
         "tab_social": "Kit Redes Sociais",
@@ -411,6 +435,10 @@ ui_languages = {
         "save_btn": "Henka wo hozon",
         "saved_msg": "Hozon kanryo!",
         "error": "Error:",
+        "err_connection": "Setsuzoku Error: AI sabisu ni todokimasen. Internet wo kakunin shite kudasai.",
+        "err_quota": "API Quota Cho-ka: Sabisu ga ippai desu. Shibaraku matte kara mou ichido.",
+        "err_image": "Gazo Error: Shashin ga shori dekimasen. JPG/PNG/WEBP fairu wo tsukaatte kudasai.",
+        "err_generic": "Yoki sezu Error ga hassei shimashita. Mou ichido kokoromi kudasai.",
         "clear_btn": "Form wo reset",
         "tab_main": "Premium kokoku",
         "tab_social": "SNS Kit",
@@ -469,6 +497,10 @@ ui_languages = {
         "save_btn": "Baocun gengge",
         "saved_msg": "Yi baocun!",
         "error": "Cuowu:",
+        "err_connection": "Lianjie Cuowu: Wufa fangwen AI fuwu. Qing jiancha hulianwang lianjie.",
+        "err_quota": "API Peie Chao: Fuwu zanshi manzai. Qing deng yi xia zai shishi.",
+        "err_image": "Tupian Cuowu: Zhaopian wufa chuli. Qing shiyong qingxi de JPG/PNG/WEBP wenjian.",
+        "err_generic": "Fasheng yiwai cuowu. Qing chongshi huo lianxi zhichi.",
         "clear_btn": "Chongzhi biaodan",
         "tab_main": "Youzhi fangyuan",
         "tab_social": "Shejiao meiti bao",
@@ -527,6 +559,10 @@ ui_languages = {
         "save_btn": "Hafz al-taghayyurat",
         "saved_msg": "Tamma al-hafz!",
         "error": "Khata':",
+        "err_connection": "Khata' Ittisaal: Ta'adhdhara al-wusul lil-khidma. Tajhid ittisaalak bil-internet.",
+        "err_quota": "Hissa Muntihat: Al-khidma muthumma muwaqqatan. Intazir wa a'id al-muhawalah.",
+        "err_image": "Khata' Suwar: Lam yumkin mu'alajat al-suwar. Istakhdimملفات JPG/PNG/WEBP wadhiha.",
+        "err_generic": "Hadatha khata' ghair mutawaqqa'. A'id al-muhawalah aw ittasil bid-da'm.",
         "clear_btn": "I'adat tashbib al-namuzaj",
         "tab_main": "Ilan mumayyaz",
         "tab_social": "Baqat al-tawasul al-ijtimaii",
@@ -561,7 +597,10 @@ for key, val in [
         st.session_state[key] = val
 
 # ─── CSS ─────────────────────────────────────────────────────────────────────
-st.markdown("""
+# FIX 3: st.html() replaces st.markdown(unsafe_allow_html=True) for the CSS block.
+# This is 2026 Streamlit best practice — prevents "accumulated whitespace" and the
+# layout-jump effect that occurs with st.markdown on every script rerun.
+st.html("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 html, body, [class*="st-"] { font-family: 'Plus Jakarta Sans', sans-serif !important; }
@@ -577,6 +616,34 @@ span[data-testid="stIconMaterial"] { display: none !important; }
     margin-top: 1.5rem; border: 1px solid #e2e8f0;
 }
 h1 { color: #0f172a !important; font-weight: 800 !important; text-align: center; }
+
+/* FIX 1: Sidebar collapse/expand toggle button — high-contrast visibility.
+   The default chevron blends into the app background on narrow or dark screens.
+   We force a dark pill with white icon that's always readable. */
+.stSidebarCollapseButton button,
+button[data-testid="stSidebarCollapseButton"],
+[data-testid="stSidebarCollapsedControl"] button {
+    color: #ffffff !important;
+    background: rgba(15, 23, 42, 0.82) !important;
+    border: 1.5px solid rgba(255, 255, 255, 0.28) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28) !important;
+    backdrop-filter: blur(4px) !important;
+    transition: all 0.2s ease !important;
+}
+.stSidebarCollapseButton button:hover,
+button[data-testid="stSidebarCollapseButton"]:hover,
+[data-testid="stSidebarCollapsedControl"] button:hover {
+    background: rgba(15, 23, 42, 1.0) !important;
+    border-color: #93c5fd !important;
+    color: #93c5fd !important;
+}
+.stSidebarCollapseButton svg,
+button[data-testid="stSidebarCollapseButton"] svg,
+[data-testid="stSidebarCollapsedControl"] svg {
+    fill: currentColor !important;
+    color: inherit !important;
+}
 
 [data-testid="stSidebar"] { background: #ffffff !important; border-right: 1px solid #e2e8f0 !important; }
 [data-testid="stSidebar"] label, [data-testid="stSidebar"] .stSelectbox label {
@@ -661,7 +728,7 @@ div[data-baseweb="select"], div[role="button"], .stSelectbox div { cursor: point
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 </style>
-""", unsafe_allow_html=True)
+""")
 
 # ─── SIDEBAR ─────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -669,14 +736,15 @@ with st.sidebar:
     if logo_img:
         st.image(logo_img, use_container_width=True)
     else:
-        st.markdown("""
+        # FIX 3: st.html() for decorative HTML snippets
+        st.html("""
         <div style="text-align:center; padding:0.8rem 0 0.5rem;">
           <span style="font-size:1.8rem; font-weight:800; color:#0f172a;">SarSa</span>
           <span style="font-size:1.8rem; font-weight:800; background:linear-gradient(135deg,#3b82f6,#8b5cf6);
           -webkit-background-clip:text;-webkit-text-fill-color:transparent;"> AI</span>
           <div style="font-size:0.62rem;color:#94a3b8;letter-spacing:2px;text-transform:uppercase;margin-top:2px;">
           Real Estate Intelligence</div>
-        </div>""", unsafe_allow_html=True)
+        </div>""")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -719,10 +787,11 @@ with st.sidebar:
     )
 
     # ── 🔑 EXTRA PROPERTY DETAILS (new — added below) ──
-    st.markdown(f"""
+    # FIX 3: st.html() for section divider labels
+    st.html(f"""
     <div style="font-size:0.68rem; font-weight:800; color:#94a3b8; text-transform:uppercase;
     letter-spacing:1.4px; padding:0.6rem 0 0.3rem 0; border-bottom:1px solid #f1f5f9; margin-bottom:0.4rem;">
-    🔑 {t['extra_details']}</div>""", unsafe_allow_html=True)
+    🔑 {t['extra_details']}</div>""")
 
     col1, col2 = st.columns(2)
     with col1:
@@ -748,20 +817,22 @@ with st.sidebar:
     st.session_state.furnishing_idx = furnishing_opts.index(furnishing_sel)
 
     # ── 🎯 MARKETING SETTINGS (new) ──
-    st.markdown(f"""
+    # FIX 3: st.html() for section divider labels
+    st.html(f"""
     <div style="font-size:0.68rem; font-weight:800; color:#94a3b8; text-transform:uppercase;
     letter-spacing:1.4px; padding:0.6rem 0 0.3rem 0; border-bottom:1px solid #f1f5f9; margin-bottom:0.4rem;">
-    🎯 {t['marketing_config']}</div>""", unsafe_allow_html=True)
+    🎯 {t['marketing_config']}</div>""")
 
     audience_opts = t["audience_opts"]
     audience_sel = st.selectbox(t["target_audience"], audience_opts, index=st.session_state.audience_idx)
     st.session_state.audience_idx = audience_opts.index(audience_sel)
 
     # ── PRO TIP ──
-    st.markdown(f"""
+    # FIX 3: st.html() for the pro-tip info box
+    st.html(f"""
     <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px;
     padding:0.7rem 1rem; font-size:0.78rem; color:#1e40af; margin-top:0.8rem; line-height:1.5;">
-    💡 {t['pro_tip']}</div>""", unsafe_allow_html=True)
+    💡 {t['pro_tip']}</div>""")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -795,11 +866,11 @@ if uploaded_files:
     images_for_ai = [Image.open(f) for f in uploaded_files]
     n = len(images_for_ai)
 
-    st.markdown(
+    # FIX 3: st.html() for the photo-count badge
+    st.html(
         f"<div style='display:inline-flex;align-items:center;gap:6px;background:#dbeafe;"
         f"color:#1d4ed8;border-radius:20px;padding:4px 12px;font-size:0.78rem;"
-        f"font-weight:700;margin-bottom:0.8rem;'>📷 {n} {t['photos_uploaded']}</div>",
-        unsafe_allow_html=True
+        f"font-weight:700;margin-bottom:0.8rem;'>📷 {n} {t['photos_uploaded']}</div>"
     )
 
     cols = st.columns(min(n, 4))
@@ -895,11 +966,21 @@ Complete digital package:
 • Schema.org markup recommendation
 • 3 blog post title ideas for organic traffic"""
 
+            # FIX 4: Classified error handling — inspects exception text and surfaces
+            # a precise, language-aware message instead of a raw generic traceback.
             try:
                 response = model.generate_content([prompt] + images_for_ai)
                 st.session_state.uretilen_ilan = response.text
             except Exception as e:
-                st.error(f"{t['error']} {e}")
+                err_str = str(e).lower()
+                if any(k in err_str for k in ["connection", "network", "timeout", "unreachable", "connect"]):
+                    st.error(f"🌐 {t['err_connection']}")
+                elif any(k in err_str for k in ["quota", "rate limit", "resource exhausted", "429", "limit"]):
+                    st.warning(f"⏳ {t['err_quota']}")
+                elif any(k in err_str for k in ["image", "invalid", "unsupported", "too large", "size", "payload"]):
+                    st.error(f"🖼️ {t['err_image']}")
+                else:
+                    st.error(f"⚠️ {t['err_generic']}\n\n`{str(e)}`")
 
     # ── RESULTS ──
     if st.session_state.uretilen_ilan:
@@ -917,17 +998,19 @@ Complete digital package:
 
         st.markdown("---")
         prop_display = f"{st.session_state.prop_type} · {st.session_state.location}" if st.session_state.prop_type else t["result"]
-        st.markdown(f"""
+
+        # FIX 3: st.html() for the result header panel
+        st.html(f"""
         <div style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);border-radius:14px;
         padding:1.2rem 1.8rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;">
             <div>
                 <div style="font-size:1.1rem;font-weight:800;color:#fff;">💎 {t['result']}</div>
                 <div style="font-size:0.8rem;color:#94a3b8;margin-top:3px;">{prop_display} — {st.session_state.tone}</div>
             </div>
-            <div style="font-size:0.75rem;color:#64748b;background:rgba(255,255,255,0.1);
+            <div style="font-size:0.75rem;background:rgba(255,255,255,0.1);
             padding:4px 12px;border-radius:20px;color:#cbd5e1;">{datetime.now().strftime('%H:%M')}</div>
         </div>
-        """, unsafe_allow_html=True)
+        """)
 
         tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
             f"📝 {t['tab_main']}", f"📱 {t['tab_social']}", f"🎬 {t['tab_video']}",
@@ -1004,15 +1087,20 @@ Strategy: {st.session_state.tone}
                 use_container_width=True
             )
         with cb:
-            st.markdown(f"""
+            # FIX 3: st.html() for the status badge
+            st.html(f"""
             <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;
             padding:0.7rem 1rem;font-size:0.78rem;color:#64748b;text-align:center;">
             ✅ 6 {t['tab_main'].split()[0] if t['tab_main'] else 'sections'} ready · {datetime.now().strftime('%H:%M')}
-            </div>""", unsafe_allow_html=True)
+            </div>""")
 
 else:
     # ── EMPTY STATE ──
-    st.markdown(f"""
+    # FIX 2: All 6 feature tags unified to blue theme (background:#dbeafe; color:#1d4ed8;
+    # border:1px solid #bfdbfe). Previously 4 were gray and only 2 were blue — this
+    # inconsistency implied some modules were less ready or less premium than others.
+    # FIX 3: st.html() replaces st.markdown() to prevent layout shifting on rerun.
+    st.html(f"""
     <div style="text-align:center;padding:4rem 2rem;color:#94a3b8;
     border:2px dashed #e2e8f0;border-radius:16px;background:#fafbfc;">
         <div style="font-size:3.5rem;margin-bottom:1rem;opacity:0.5;">🏘️</div>
@@ -1022,12 +1110,12 @@ else:
             {t['empty']}
         </div>
         <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:1.4rem;">
-            <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">📝 {t['tab_main']}</span>
-            <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">📱 {t['tab_social']}</span>
-            <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">🎬 {t['tab_video']}</span>
-            <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">⚙️ {t['tab_tech']}</span>
+            <span style="background:#dbeafe;color:#1d4ed8;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #bfdbfe;">📝 {t['tab_main']}</span>
+            <span style="background:#dbeafe;color:#1d4ed8;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #bfdbfe;">📱 {t['tab_social']}</span>
+            <span style="background:#dbeafe;color:#1d4ed8;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #bfdbfe;">🎬 {t['tab_video']}</span>
+            <span style="background:#dbeafe;color:#1d4ed8;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #bfdbfe;">⚙️ {t['tab_tech']}</span>
             <span style="background:#dbeafe;color:#1d4ed8;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #bfdbfe;">✉️ {t['tab_email']}</span>
             <span style="background:#dbeafe;color:#1d4ed8;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #bfdbfe;">🔍 {t['tab_seo']}</span>
         </div>
     </div>
-    """, unsafe_allow_html=True)
+    """)
