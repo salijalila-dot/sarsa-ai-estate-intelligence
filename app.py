@@ -693,7 +693,7 @@ if uploaded_files:
             p_aud = t["audience_opts"][st.session_state.audience_idx]
             details = f"Type: {st.session_state.prop_type}, Loc: {st.session_state.location}, Price: {st.session_state.price}, Beds: {st.session_state.bedrooms}, Baths: {st.session_state.bathrooms}, Area: {st.session_state.area_size}, Year: {st.session_state.year_built}, Furn: {p_furn}, Audience: {p_aud}, Tone: {st.session_state.tone}, Notes: {st.session_state.custom_inst}"
             
-            prompt = f"""Write ALL content in {st.session_state.target_lang_input}. 
+            prompt = f"""Write ALL content in {st.session_state.target_lang_input}.
             Generate 7 specific sections based on the uploaded photos and these details: {details}.
             Structure each section with exactly ## SECTION_N headers.
 
@@ -739,4 +739,24 @@ if uploaded_files:
 
         st.download_button(label=f"📥 {t['download_all']}", data=raw, file_name=f"sarsa_complete_{ts}.txt", use_container_width=True)
 else:
-    st.info(t['empty'])
+    # ── EMPTY STATE ──
+    st.markdown(f"""
+    <div style="text-align:center;padding:4rem 2rem;color:#94a3b8;
+    border:2px dashed #e2e8f0;border-radius:16px;background:#fafbfc;">
+        <div style="font-size:3.5rem;margin-bottom:1rem;opacity:0.5;">🏘️</div>
+        <div style="font-size:1.25rem;font-weight:700;color:#475569;margin-bottom:0.8rem;">
+            {t.get('result', 'Executive Preview')}</div>
+        <div style="font-size:0.9rem;max-width:420px;margin:0 auto;line-height:1.6;color:#64748b;">
+            {t['empty']}
+        </div>
+        <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:1.4rem;">
+            <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">📝 {t['tab_main']}</span>
+            <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">📱 {t['tab_social']}</span>
+            <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">🎬 {t['tab_video']}</span>
+            <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">⚙️ {t['tab_tech']}</span>
+            <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">✉️ {t['tab_email']}</span>
+            <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">🔍 {t['tab_seo']}</span>
+            <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">📸 {t.get('tab_photo', 'Photo Guide')}</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
