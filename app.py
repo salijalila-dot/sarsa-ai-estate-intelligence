@@ -597,9 +597,6 @@ for key, val in [
         st.session_state[key] = val
 
 # ─── CSS ─────────────────────────────────────────────────────────────────────
-# FIX 3: st.html() replaces st.markdown(unsafe_allow_html=True) for the CSS block.
-# This is 2026 Streamlit best practice — prevents "accumulated whitespace" and the
-# layout-jump effect that occurs with st.markdown on every script rerun.
 st.html("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
@@ -617,10 +614,38 @@ span[data-testid="stIconMaterial"] { display: none !important; }
 }
 h1 { color: #0f172a !important; font-weight: 800 !important; text-align: center; }
 
-/* FIX 1: Sidebar collapse/expand toggle — surgical fix, touches ONLY these
-   two data-testid containers and nothing else. Makes the button visible with
-   a clear border and forces the inner SVG arrow to render in a dark color. */
-[data-testid="stSidebarCollapseButton"] button,
+/* ── Sidebar toggle button — open state (➡️ to close) ── */
+[data-testid="stSidebarCollapseButton"] button {
+    background: #ffffff !important;
+    border: 2px solid #cbd5e1 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 2px 8px rgba(15,23,42,0.18) !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    width: 2.4rem !important;
+    height: 2.4rem !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: all 0.2s ease !important;
+}
+[data-testid="stSidebarCollapseButton"] button:hover {
+    background: #0f172a !important;
+    border-color: #0f172a !important;
+    box-shadow: 0 4px 14px rgba(15,23,42,0.35) !important;
+}
+/* Hide default SVG when sidebar is open */
+[data-testid="stSidebarCollapseButton"] button svg {
+    display: none !important;
+}
+/* Show ➡️ emoji when sidebar is open (click to close) */
+[data-testid="stSidebarCollapseButton"] button::after {
+    content: "➡️";
+    font-size: 1.1rem;
+    line-height: 1;
+}
+
+/* ── Sidebar toggle button — collapsed state (⬅️ to open) ── */
 [data-testid="stSidebarCollapsedControl"] button {
     background: #ffffff !important;
     border: 2px solid #cbd5e1 !important;
@@ -628,27 +653,27 @@ h1 { color: #0f172a !important; font-weight: 800 !important; text-align: center;
     box-shadow: 0 2px 8px rgba(15,23,42,0.18) !important;
     opacity: 1 !important;
     visibility: visible !important;
+    width: 2.4rem !important;
+    height: 2.4rem !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
     transition: all 0.2s ease !important;
 }
-[data-testid="stSidebarCollapseButton"] button:hover,
 [data-testid="stSidebarCollapsedControl"] button:hover {
     background: #0f172a !important;
     border-color: #0f172a !important;
     box-shadow: 0 4px 14px rgba(15,23,42,0.35) !important;
 }
-/* Force the arrow SVG path to be visible in dark color by default,
-   white on hover via the parent hover state. */
-[data-testid="stSidebarCollapseButton"] button svg,
+/* Hide default SVG when sidebar is collapsed */
 [data-testid="stSidebarCollapsedControl"] button svg {
-    fill: #0f172a !important;
-    color: #0f172a !important;
-    opacity: 1 !important;
-    visibility: visible !important;
+    display: none !important;
 }
-[data-testid="stSidebarCollapseButton"] button:hover svg,
-[data-testid="stSidebarCollapsedControl"] button:hover svg {
-    fill: #ffffff !important;
-    color: #ffffff !important;
+/* Show ⬅️ emoji when sidebar is collapsed (click to open) */
+[data-testid="stSidebarCollapsedControl"] button::after {
+    content: "⬅️";
+    font-size: 1.1rem;
+    line-height: 1;
 }
 
 [data-testid="stSidebar"] { background: #ffffff !important; border-right: 1px solid #e2e8f0 !important; }
@@ -742,7 +767,6 @@ with st.sidebar:
     if logo_img:
         st.image(logo_img, use_container_width=True)
     else:
-        # FIX 3: st.html() for decorative HTML snippets
         st.html("""
         <div style="text-align:center; padding:0.8rem 0 0.5rem;">
           <span style="font-size:1.8rem; font-weight:800; color:#0f172a;">SarSa</span>
@@ -793,7 +817,6 @@ with st.sidebar:
     )
 
     # ── 🔑 EXTRA PROPERTY DETAILS (new — added below) ──
-    # FIX 3: st.html() for section divider labels
     st.html(f"""
     <div style="font-size:0.68rem; font-weight:800; color:#94a3b8; text-transform:uppercase;
     letter-spacing:1.4px; padding:0.6rem 0 0.3rem 0; border-bottom:1px solid #f1f5f9; margin-bottom:0.4rem;">
@@ -823,7 +846,6 @@ with st.sidebar:
     st.session_state.furnishing_idx = furnishing_opts.index(furnishing_sel)
 
     # ── 🎯 MARKETING SETTINGS (new) ──
-    # FIX 3: st.html() for section divider labels
     st.html(f"""
     <div style="font-size:0.68rem; font-weight:800; color:#94a3b8; text-transform:uppercase;
     letter-spacing:1.4px; padding:0.6rem 0 0.3rem 0; border-bottom:1px solid #f1f5f9; margin-bottom:0.4rem;">
@@ -834,7 +856,6 @@ with st.sidebar:
     st.session_state.audience_idx = audience_opts.index(audience_sel)
 
     # ── PRO TIP ──
-    # FIX 3: st.html() for the pro-tip info box
     st.html(f"""
     <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px;
     padding:0.7rem 1rem; font-size:0.78rem; color:#1e40af; margin-top:0.8rem; line-height:1.5;">
@@ -872,7 +893,6 @@ if uploaded_files:
     images_for_ai = [Image.open(f) for f in uploaded_files]
     n = len(images_for_ai)
 
-    # FIX 3: st.html() for the photo-count badge
     st.html(
         f"<div style='display:inline-flex;align-items:center;gap:6px;background:#dbeafe;"
         f"color:#1d4ed8;border-radius:20px;padding:4px 12px;font-size:0.78rem;"
@@ -972,8 +992,6 @@ Complete digital package:
 • Schema.org markup recommendation
 • 3 blog post title ideas for organic traffic"""
 
-            # FIX 4: Classified error handling — inspects exception text and surfaces
-            # a precise, language-aware message instead of a raw generic traceback.
             try:
                 response = model.generate_content([prompt] + images_for_ai)
                 st.session_state.uretilen_ilan = response.text
@@ -1005,7 +1023,6 @@ Complete digital package:
         st.markdown("---")
         prop_display = f"{st.session_state.prop_type} · {st.session_state.location}" if st.session_state.prop_type else t["result"]
 
-        # FIX 3: st.html() for the result header panel
         st.html(f"""
         <div style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);border-radius:14px;
         padding:1.2rem 1.8rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;">
@@ -1093,7 +1110,6 @@ Strategy: {st.session_state.tone}
                 use_container_width=True
             )
         with cb:
-            # FIX 3: st.html() for the status badge
             st.html(f"""
             <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;
             padding:0.7rem 1rem;font-size:0.78rem;color:#64748b;text-align:center;">
@@ -1101,11 +1117,6 @@ Strategy: {st.session_state.tone}
             </div>""")
 
 else:
-    # ── EMPTY STATE ──
-    # FIX 2: All 6 feature tags unified to blue theme (background:#dbeafe; color:#1d4ed8;
-    # border:1px solid #bfdbfe). Previously 4 were gray and only 2 were blue — this
-    # inconsistency implied some modules were less ready or less premium than others.
-    # FIX 3: st.html() replaces st.markdown() to prevent layout shifting on rerun.
     st.html(f"""
     <div style="text-align:center;padding:4rem 2rem;color:#94a3b8;
     border:2px dashed #e2e8f0;border-radius:16px;background:#fafbfc;">
