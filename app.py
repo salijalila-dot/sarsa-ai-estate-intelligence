@@ -614,7 +614,7 @@ span[data-testid="stIconMaterial"] { display: none !important; }
 }
 h1 { color: #0f172a !important; font-weight: 800 !important; text-align: center; }
 
-/* ── Sidebar toggle buttons ── */
+/* ── Sidebar collapse button (inside sidebar, closes it) ── */
 [data-testid="stSidebarCollapseButton"] button {
     background: #1e293b !important;
     border: none !important;
@@ -626,15 +626,23 @@ h1 { color: #0f172a !important; font-weight: 800 !important; text-align: center;
     cursor: pointer !important;
     box-shadow: 0 2px 8px rgba(15,23,42,0.3) !important;
 }
-[data-testid="stSidebarCollapseButton"] button:hover {
-    background: #334155 !important;
-}
+[data-testid="stSidebarCollapseButton"] button:hover { background: #334155 !important; }
 [data-testid="stSidebarCollapseButton"] button svg {
-    fill: #ffffff !important;
-    color: #ffffff !important;
-    stroke: #ffffff !important;
+    fill: #ffffff !important; color: #ffffff !important; stroke: #ffffff !important;
 }
-[data-testid="stSidebarCollapsedControl"] button {
+
+/* ── Sidebar open button (outside sidebar, opens it) ── */
+/* Cover all known selector variants across Streamlit versions */
+[data-testid="stSidebarCollapsedControl"],
+[data-testid="collapsedControl"] {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+[data-testid="stSidebarCollapsedControl"] button,
+[data-testid="collapsedControl"] button,
+button[kind="header"],
+button[data-testid="stSidebarCollapsedControl"] {
     background: #1e293b !important;
     border: none !important;
     border-radius: 8px !important;
@@ -644,14 +652,20 @@ h1 { color: #0f172a !important; font-weight: 800 !important; text-align: center;
     padding: 0 !important;
     cursor: pointer !important;
     box-shadow: 0 2px 8px rgba(15,23,42,0.3) !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
 }
-[data-testid="stSidebarCollapsedControl"] button:hover {
-    background: #334155 !important;
-}
-[data-testid="stSidebarCollapsedControl"] button svg {
-    fill: #ffffff !important;
-    color: #ffffff !important;
-    stroke: #ffffff !important;
+[data-testid="stSidebarCollapsedControl"] button:hover,
+[data-testid="collapsedControl"] button:hover,
+button[kind="header"]:hover { background: #334155 !important; }
+[data-testid="stSidebarCollapsedControl"] button svg,
+[data-testid="collapsedControl"] button svg,
+button[kind="header"] svg {
+    fill: #ffffff !important; color: #ffffff !important; stroke: #ffffff !important;
+    visibility: visible !important; opacity: 1 !important;
 }
 
 [data-testid="stSidebar"] { background: #ffffff !important; border-right: 1px solid #e2e8f0 !important; }
