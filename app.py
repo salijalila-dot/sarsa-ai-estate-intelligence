@@ -614,37 +614,53 @@ span[data-testid="stIconMaterial"] { display: none !important; }
 }
 h1 { color: #0f172a !important; font-weight: 800 !important; text-align: center; }
 
-/* ── Sidebar toggle buttons — both states ── */
-[data-testid="stSidebarCollapseButton"] button,
-[data-testid="stSidebarCollapsedControl"] button {
-    background: #ffffff !important;
+/* ── Sidebar toggle button: OPEN → click to close (➡️) ── */
+[data-testid="stSidebarCollapseButton"] button {
     border: 2px solid #cbd5e1 !important;
     border-radius: 8px !important;
     box-shadow: 0 2px 8px rgba(15,23,42,0.18) !important;
-    opacity: 1 !important;
-    visibility: visible !important;
     width: 2.4rem !important;
     height: 2.4rem !important;
     min-width: 2.4rem !important;
     padding: 0 !important;
+    background-color: #ffffff !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'%3E%3Ctext x='18' y='26' text-anchor='middle' font-size='22'%3E%E2%9E%A1%EF%B8%8F%3C/text%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: center !important;
+    background-size: 75% !important;
     transition: all 0.2s ease !important;
+    cursor: pointer !important;
 }
-[data-testid="stSidebarCollapseButton"] button:hover,
-[data-testid="stSidebarCollapsedControl"] button:hover {
-    background: #0f172a !important;
+[data-testid="stSidebarCollapseButton"] button:hover {
+    background-color: #f1f5f9 !important;
     border-color: #0f172a !important;
-    box-shadow: 0 4px 14px rgba(15,23,42,0.35) !important;
+    box-shadow: 0 4px 14px rgba(15,23,42,0.25) !important;
 }
-[data-testid="stSidebarCollapseButton"] button svg,
-[data-testid="stSidebarCollapsedControl"] button svg {
-    display: none !important;
+[data-testid="stSidebarCollapseButton"] button svg { display: none !important; }
+
+/* ── Sidebar toggle button: CLOSED → click to open (⬅️) ── */
+[data-testid="stSidebarCollapsedControl"] button {
+    border: 2px solid #cbd5e1 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 2px 8px rgba(15,23,42,0.18) !important;
+    width: 2.4rem !important;
+    height: 2.4rem !important;
+    min-width: 2.4rem !important;
+    padding: 0 !important;
+    background-color: #ffffff !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'%3E%3Ctext x='18' y='26' text-anchor='middle' font-size='22'%3E%E2%AC%85%EF%B8%8F%3C/text%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: center !important;
+    background-size: 75% !important;
+    transition: all 0.2s ease !important;
+    cursor: pointer !important;
 }
-[data-testid="stSidebarCollapsedControl"] {
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    pointer-events: auto !important;
+[data-testid="stSidebarCollapsedControl"] button:hover {
+    background-color: #f1f5f9 !important;
+    border-color: #0f172a !important;
+    box-shadow: 0 4px 14px rgba(15,23,42,0.25) !important;
 }
+[data-testid="stSidebarCollapsedControl"] button svg { display: none !important; }
 
 [data-testid="stSidebar"] { background: #ffffff !important; border-right: 1px solid #e2e8f0 !important; }
 [data-testid="stSidebar"] label, [data-testid="stSidebar"] .stSelectbox label {
@@ -731,46 +747,6 @@ div[data-baseweb="select"], div[role="button"], .stSelectbox div { cursor: point
 </style>
 """)
 
-
-# ─── SIDEBAR BUTTON EMOJI INJECTION (JS) ────────────────────────────────────
-st.html("""
-<script>
-(function injectSidebarEmojis() {
-    function applyEmojis() {
-        var collapseBtn = document.querySelector('[data-testid="stSidebarCollapseButton"] button');
-        if (collapseBtn) {
-            var svgs = collapseBtn.querySelectorAll('svg');
-            svgs.forEach(function(s){ s.style.display='none'; });
-            if (!collapseBtn.querySelector('.sarsa-emoji')) {
-                var span = document.createElement('span');
-                span.className = 'sarsa-emoji';
-                span.style.cssText = 'font-size:1.1rem;line-height:1;display:block;pointer-events:none;';
-                span.textContent = '\u27a1\ufe0f';
-                collapseBtn.appendChild(span);
-            }
-        }
-        var expandBtn = document.querySelector('[data-testid="stSidebarCollapsedControl"] button');
-        if (expandBtn) {
-            var svgs2 = expandBtn.querySelectorAll('svg');
-            svgs2.forEach(function(s){ s.style.display='none'; });
-            if (!expandBtn.querySelector('.sarsa-emoji')) {
-                var span2 = document.createElement('span');
-                span2.className = 'sarsa-emoji';
-                span2.style.cssText = 'font-size:1.1rem;line-height:1;display:block;pointer-events:none;';
-                span2.textContent = '\u2b05\ufe0f';
-                expandBtn.appendChild(span2);
-            }
-        }
-    }
-    applyEmojis();
-    var observer = new MutationObserver(function(){ applyEmojis(); });
-    observer.observe(document.body, { childList: true, subtree: true });
-    setTimeout(applyEmojis, 500);
-    setTimeout(applyEmojis, 1500);
-    setTimeout(applyEmojis, 3000);
-})();
-</script>
-""")
 
 # ─── SIDEBAR ─────────────────────────────────────────────────────────────────
 with st.sidebar:
