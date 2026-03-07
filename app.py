@@ -639,52 +639,84 @@ h1 { color: #0f172a !important; font-weight: 800 !important; text-align: center;
 [data-testid="stSidebarCollapseButton"] button svg { display: none !important; }
 
 /* ── Sidebar toggle button: CLOSED → click to open ── */
-/* Target every possible selector Streamlit uses across versions */
-[data-testid="stSidebarCollapsedControl"],
-div[data-testid="stSidebarCollapsedControl"],
-section[data-testid="stSidebarCollapsedControl"] {
+/* Override Streamlit's transform/translate hiding mechanism */
+[data-testid="stSidebarCollapsedControl"] {
+    position: fixed !important;
+    top: 0.75rem !important;
+    left: 0.75rem !important;
+    transform: none !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    z-index: 999999 !important;
+    width: 2.6rem !important;
+    height: 2.6rem !important;
+}
+[data-testid="stSidebarCollapsedControl"] > * {
+    transform: none !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+[data-testid="stSidebarCollapsedControl"] button {
+    transform: none !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    border: 2px solid #94a3b8 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 2px 8px rgba(15,23,42,0.2) !important;
+    width: 2.6rem !important;
+    height: 2.6rem !important;
+    min-width: 2.6rem !important;
+    padding: 0 !important;
+    background-color: #ffffff !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'%3E%3Ctext x='18' y='26' text-anchor='middle' font-size='22'%3E%E2%AC%85%EF%B8%8F%3C/text%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: center !important;
+    background-size: 72% !important;
+    cursor: pointer !important;
+}
+[data-testid="stSidebarCollapsedControl"] button:hover {
+    background-color: #f1f5f9 !important;
+    border-color: #0f172a !important;
+    box-shadow: 0 4px 14px rgba(15,23,42,0.3) !important;
+}
+[data-testid="stSidebarCollapsedControl"] button svg { display: none !important; }
+/* Also target alternate selector name used in some Streamlit versions */
+[data-testid="collapsedControl"] {
+    position: fixed !important;
+    top: 0.75rem !important;
+    left: 0.75rem !important;
+    transform: none !important;
     display: block !important;
     visibility: visible !important;
     opacity: 1 !important;
     pointer-events: auto !important;
     z-index: 999999 !important;
 }
-[data-testid="stSidebarCollapsedControl"] *,
-div[data-testid="stSidebarCollapsedControl"] * {
-    visibility: visible !important;
-    opacity: 1 !important;
-    pointer-events: auto !important;
-}
-[data-testid="stSidebarCollapsedControl"] button,
-div[data-testid="stSidebarCollapsedControl"] button {
+[data-testid="collapsedControl"] button {
+    transform: none !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    border: 2px solid #cbd5e1 !important;
+    border: 2px solid #94a3b8 !important;
     border-radius: 8px !important;
-    box-shadow: 0 2px 8px rgba(15,23,42,0.18) !important;
-    width: 2.4rem !important;
-    height: 2.4rem !important;
-    min-width: 2.4rem !important;
+    box-shadow: 0 2px 8px rgba(15,23,42,0.2) !important;
+    width: 2.6rem !important;
+    height: 2.6rem !important;
     padding: 0 !important;
     background-color: #ffffff !important;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'%3E%3Ctext x='18' y='26' text-anchor='middle' font-size='22'%3E%E2%AC%85%EF%B8%8F%3C/text%3E%3C/svg%3E") !important;
     background-repeat: no-repeat !important;
     background-position: center !important;
-    background-size: 75% !important;
-    transition: all 0.2s ease !important;
+    background-size: 72% !important;
     cursor: pointer !important;
 }
-[data-testid="stSidebarCollapsedControl"] button:hover,
-div[data-testid="stSidebarCollapsedControl"] button:hover {
-    background-color: #f1f5f9 !important;
-    border-color: #0f172a !important;
-    box-shadow: 0 4px 14px rgba(15,23,42,0.25) !important;
-}
-[data-testid="stSidebarCollapsedControl"] button svg,
-div[data-testid="stSidebarCollapsedControl"] button svg { display: none !important; }
+[data-testid="collapsedControl"] button svg { display: none !important; }
 
 [data-testid="stSidebar"] { background: #ffffff !important; border-right: 1px solid #e2e8f0 !important; }
 [data-testid="stSidebar"] label, [data-testid="stSidebar"] .stSelectbox label {
