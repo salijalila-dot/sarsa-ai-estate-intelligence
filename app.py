@@ -617,32 +617,60 @@ span[data-testid="stIconMaterial"] { display: none !important; }
 }
 h1 { color: #0f172a !important; font-weight: 800 !important; text-align: center; }
 
-/* FIX 1: Sidebar collapse/expand toggle button — high-contrast visibility.
-   The default chevron blends into the app background on narrow or dark screens.
-   We force a dark pill with white icon that's always readable. */
+/* FIX 1: Sidebar collapse/expand toggle — force visible at all times.
+   Cast a wide net across all known Streamlit selector patterns so the
+   button is styled regardless of Streamlit version or theming. */
+[data-testid="stSidebarCollapseButton"],
+[data-testid="stSidebarCollapsedControl"],
+.stSidebarCollapseButton,
+div[data-testid="stSidebarCollapseButton"],
+div[data-testid="stSidebarCollapsedControl"] {
+    display: block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+[data-testid="stSidebarCollapseButton"] button,
+[data-testid="stSidebarCollapsedControl"] button,
 .stSidebarCollapseButton button,
-button[data-testid="stSidebarCollapseButton"],
-[data-testid="stSidebarCollapsedControl"] button {
-    color: #ffffff !important;
-    background: rgba(15, 23, 42, 0.82) !important;
-    border: 1.5px solid rgba(255, 255, 255, 0.28) !important;
+section[data-testid="stSidebar"] ~ div button,
+button[kind="headerNoPadding"] {
+    display: flex !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    color: #0f172a !important;
+    background: #ffffff !important;
+    border: 2px solid #0f172a !important;
     border-radius: 8px !important;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28) !important;
-    backdrop-filter: blur(4px) !important;
+    box-shadow: 0 2px 8px rgba(15,23,42,0.25), 0 0 0 3px rgba(15,23,42,0.08) !important;
+    width: 2rem !important;
+    height: 2rem !important;
+    min-width: 2rem !important;
+    min-height: 2rem !important;
+    padding: 0 !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
     transition: all 0.2s ease !important;
 }
+[data-testid="stSidebarCollapseButton"] button:hover,
+[data-testid="stSidebarCollapsedControl"] button:hover,
 .stSidebarCollapseButton button:hover,
-button[data-testid="stSidebarCollapseButton"]:hover,
-[data-testid="stSidebarCollapsedControl"] button:hover {
-    background: rgba(15, 23, 42, 1.0) !important;
-    border-color: #93c5fd !important;
-    color: #93c5fd !important;
+section[data-testid="stSidebar"] ~ div button:hover {
+    background: #0f172a !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 14px rgba(15,23,42,0.4) !important;
+    transform: scale(1.05) !important;
 }
+[data-testid="stSidebarCollapseButton"] svg,
+[data-testid="stSidebarCollapsedControl"] svg,
 .stSidebarCollapseButton svg,
-button[data-testid="stSidebarCollapseButton"] svg,
-[data-testid="stSidebarCollapsedControl"] svg {
+section[data-testid="stSidebar"] ~ div button svg {
+    width: 1.1rem !important;
+    height: 1.1rem !important;
     fill: currentColor !important;
     color: inherit !important;
+    opacity: 1 !important;
+    visibility: visible !important;
 }
 
 [data-testid="stSidebar"] { background: #ffffff !important; border-right: 1px solid #e2e8f0 !important; }
