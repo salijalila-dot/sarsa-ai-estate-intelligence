@@ -632,17 +632,7 @@ h1 { color: #0f172a !important; font-weight: 800 !important; text-align: center;
 }
 
 /* ── Sidebar open button (outside sidebar, opens it) ── */
-/* Cover all known selector variants across Streamlit versions */
-[data-testid="stSidebarCollapsedControl"],
-[data-testid="collapsedControl"] {
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-}
-[data-testid="stSidebarCollapsedControl"] button,
-[data-testid="collapsedControl"] button,
-button[kind="header"],
-button[data-testid="stSidebarCollapsedControl"] {
+[data-testid="stSidebarCollapsedControl"] button {
     background: #1e293b !important;
     border: none !important;
     border-radius: 8px !important;
@@ -652,20 +642,10 @@ button[data-testid="stSidebarCollapsedControl"] {
     padding: 0 !important;
     cursor: pointer !important;
     box-shadow: 0 2px 8px rgba(15,23,42,0.3) !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
 }
-[data-testid="stSidebarCollapsedControl"] button:hover,
-[data-testid="collapsedControl"] button:hover,
-button[kind="header"]:hover { background: #334155 !important; }
-[data-testid="stSidebarCollapsedControl"] button svg,
-[data-testid="collapsedControl"] button svg,
-button[kind="header"] svg {
+[data-testid="stSidebarCollapsedControl"] button:hover { background: #334155 !important; }
+[data-testid="stSidebarCollapsedControl"] button svg {
     fill: #ffffff !important; color: #ffffff !important; stroke: #ffffff !important;
-    visibility: visible !important; opacity: 1 !important;
 }
 
 [data-testid="stSidebar"] { background: #ffffff !important; border-right: 1px solid #e2e8f0 !important; }
@@ -757,6 +737,26 @@ div[data-baseweb="select"], div[role="button"], .stSelectbox div { cursor: point
 
 # ─── SIDEBAR ─────────────────────────────────────────────────────────────────
 with st.sidebar:
+    # Inject collapsed-button style directly — sidebar st.html shares parent document
+    st.html("""
+    <style>
+    [data-testid="stSidebarCollapsedControl"] button {
+        background: #1e293b !important;
+        border: none !important;
+        border-radius: 8px !important;
+        width: 2.2rem !important;
+        height: 2.2rem !important;
+        min-width: 2.2rem !important;
+        box-shadow: 0 2px 8px rgba(15,23,42,0.3) !important;
+        cursor: pointer !important;
+    }
+    [data-testid="stSidebarCollapsedControl"] button svg {
+        fill: #ffffff !important;
+        color: #ffffff !important;
+        stroke: #ffffff !important;
+    }
+    </style>
+    """)
     logo_img = load_logo("SarSa_Logo_Transparent.png")
     if logo_img:
         st.image(logo_img, use_container_width=True)
