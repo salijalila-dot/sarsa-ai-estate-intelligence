@@ -7,8 +7,8 @@ from datetime import datetime
 # ─── AI CONFIGURATION ───────────────────────────────────────────────────────
 GOOGLE_API_KEY = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=GOOGLE_API_KEY)
-# Note: Changed to 2.0-flash as 2.5 does not exist yet; ensures the code runs.
-MODEL_NAME = 'gemini-2.0-flash' 
+
+MODEL_NAME = 'gemini-2.5-flash' 
 model = genai.GenerativeModel(MODEL_NAME)
 
 # ─── PAGE CONFIG ────────────────────────────────────────────────────────────
