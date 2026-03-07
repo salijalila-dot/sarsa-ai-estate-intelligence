@@ -639,7 +639,23 @@ h1 { color: #0f172a !important; font-weight: 800 !important; text-align: center;
 [data-testid="stSidebarCollapseButton"] button svg { display: none !important; }
 
 /* ── Sidebar toggle button: CLOSED → click to open (⬅️) ── */
+/* Force entire collapsed control chain to be visible */
+[data-testid="stSidebarCollapsedControl"],
+[data-testid="stSidebarCollapsedControl"] > *,
+[data-testid="stSidebarCollapsedControl"] > * > * {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    position: relative !important;
+    z-index: 999999 !important;
+}
 [data-testid="stSidebarCollapsedControl"] button {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    visibility: visible !important;
+    opacity: 1 !important;
     border: 2px solid #cbd5e1 !important;
     border-radius: 8px !important;
     box-shadow: 0 2px 8px rgba(15,23,42,0.18) !important;
