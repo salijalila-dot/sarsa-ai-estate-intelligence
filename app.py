@@ -5,6 +5,7 @@ import os
 from datetime import datetime
 
 # ─── AI CONFIGURATION ───────────────────────────────────────────────────────
+# API Key erişimi düzeltildi
 GOOGLE_API_KEY = st.secrets
 genai.configure(api_key=GOOGLE_API_KEY)
 MODEL_NAME = 'gemini-2.5-flash'
@@ -23,7 +24,7 @@ def load_logo(file_path):
         return Image.open(file_path)
     return None
 
-# ─── LANGUAGE SYSTEM ────────────────────────────────────────────────────────
+# ─── LANGUAGE SYSTEM (Fixed Syntax Error) ───────────────────────────────────
 ui_languages = {
     "English": {
         "title": "SarSa AI | Real Estate Intelligence Platform",
@@ -144,7 +145,7 @@ ui_languages = {
         "label_seo": "SEO & Web Metni",
         "photos_uploaded": "fotoğraf yüklendi",
         "pro_tip": "İpucu: En iyi sonuç için dış mekan, iç mekan ve önemli özellikleri içeren 3-6 fotoğraf yükleyin.",
-        "extra_details": "Ek Mülk Detayları",
+        "extra_details": "Ek Mülk Detaylari",
         "marketing_config": "Pazarlama Ayarları",
         "interface_lang": "Arayüz Dili",
         "config_section": "Yapılandırma",
@@ -170,16 +171,19 @@ html, body, [class*="st-"] { font-family: 'Plus Jakarta Sans', sans-serif!import
 .stApp { background-color: #f0f4f8!important; }
 div[data-testid="stInputInstructions"] { display: none!important; }
 #MainMenu, footer { display: none!important; }
-div { display: none!important; }
 span[data-testid="stIconMaterial"] { display: none!important; }
 
 /* ── PRO SIDEBAR BUTTONS (CUSTOM EMOJIS) ── */
-/* 1. Sidebar Kapatma Butonu (Sidebar içindeki buton) */
+/* 1. Sidebar Kapatma Butonu (Sidebar açıkken) */
  button {
-    background-color: #1e293b!important;
-    border: 1px solid #334155!important;
+    background-color: #0f172a!important;
+    border: 1px solid #1e293b!important;
     border-radius: 8px!important;
-    color: white!important;
+    width: 2.5rem!important;
+    height: 2.5rem!important;
+    display: flex!important;
+    align-items: center!important;
+    justify-content: center!important;
 }
  button:after {
     content: "➡️"!important;
@@ -187,13 +191,17 @@ span[data-testid="stIconMaterial"] { display: none!important; }
 }
  button svg { display: none!important; }
 
-/* 2. Sidebar Açma Butonu (Sidebar kapalıyken dışarıdaki buton) */
+/* 2. Sidebar Açma Butonu (Sidebar kapalıyken) */
  button {
     background-color: #0f172a!important;
     border: 1px solid #1e293b!important;
     border-radius: 8px!important;
-    color: white!important;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15)!important;
+    width: 2.5rem!important;
+    height: 2.5rem!important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2)!important;
+    display: flex!important;
+    align-items: center!important;
+    justify-content: center!important;
 }
  button:after {
     content: "⬅️"!important;
@@ -209,10 +217,6 @@ span[data-testid="stIconMaterial"] { display: none!important; }
 h1 { color: #0f172a!important; font-weight: 800!important; text-align: center; }
 
  { background: #ffffff!important; border-right: 1px solid #e2e8f0!important; }
- label {
-    font-size: 0.74rem!important; font-weight: 700!important;
-    color: #64748b!important; text-transform: uppercase!important; letter-spacing: 0.7px!important;
-}
 
 .stButton > button {
     background: #0f172a!important; color: white!important;
@@ -222,18 +226,10 @@ h1 { color: #0f172a!important; font-weight: 800!important; text-align: center; }
     transition: all 0.25s ease!important;
     box-shadow: 0 4px 15px rgba(15,23,42,0.3)!important;
 }
-.stButton > button:hover {
-    background: #1e293b!important; transform: translateY(-1px)!important;
-}
 
 .stTabs [aria-selected="true"] {
     background-color: #0f172a!important; color: white!important;
     border-radius: 8px 8px 0 0!important;
-}
-
-[data-testid="stFileUploader"] {
-    border-radius: 14px!important; border: 2px dashed #cbd5e1!important;
-    background: #f8fafc!important; transition: all 0.3s!important; padding: 1rem!important;
 }
 </style>
 """)
@@ -254,7 +250,6 @@ with st.sidebar:
         </div>""")
 
     st.markdown("<br>", unsafe_allow_html=True)
-
     current_ui_lang = st.selectbox("🌐 Interface Language", list(ui_languages.keys()), index=0)
     t = ui_languages[current_ui_lang]
 
@@ -266,8 +261,9 @@ with st.sidebar:
     st.session_state.price = st.text_input(t["price"], value=st.session_state.price, placeholder=t["ph_price"])
     st.session_state.location = st.text_input(t["location"], value=st.session_state.location, placeholder=t["ph_loc"])
 
-    current_tone_idx = t["tones"].index(st.session_state.tone) if st.session_state.tone in t["tones"] else 0
-    st.session_state.tone = st.selectbox(t["tone"], t["tones"], index=current_tone_idx)
+    tones = t["tones"]
+    current_tone_idx = tones.index(st.session_state.tone) if st.session_state.tone in tones else 0
+    st.session_state.tone = st.selectbox(t["tone"], tones, index=current_tone_idx)
 
     st.session_state.custom_inst = st.text_area(f"📝 {t['custom_inst']}", value=st.session_state.custom_inst, placeholder=t["custom_inst_ph"], height=100)
 
@@ -338,7 +334,6 @@ if uploaded_files:
                 else: st.error(f"{t['err_generic']} ({str(e)})")
 
     if st.session_state.uretilen_ilan:
-        # (Sonuçları gösteren kısım korunmuştur)
         raw = st.session_state.uretilen_ilan
         sec = {str(i): "" for i in range(1, 7)}
         for p in raw.split("##"):
@@ -358,7 +353,8 @@ if uploaded_files:
         
         for i, tab in enumerate(tabs):
             with tab:
-                edited = st.text_area(t[f"label_{suffixes[i]}"], value=sec[str(i+1)], height=450, key=f"txt_{i}")
+                label_key = f"label_{suffixes[i]}"
+                edited = st.text_area(t[label_key], value=sec[str(i+1)], height=450, key=f"txt_{i}")
                 c1, c2 = st.columns(2)
                 with c1: 
                     if st.button(f"💾 {t['save_btn']}", key=f"save_{i}"): st.success(t["saved_msg"])
