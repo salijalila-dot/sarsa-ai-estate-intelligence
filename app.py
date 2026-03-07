@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 from PIL import Image
 import google.generativeai as genai
 import os
@@ -638,85 +639,7 @@ h1 { color: #0f172a !important; font-weight: 800 !important; text-align: center;
 }
 [data-testid="stSidebarCollapseButton"] button svg { display: none !important; }
 
-/* ── Sidebar toggle button: CLOSED → click to open ── */
-/* Override Streamlit's transform/translate hiding mechanism */
-[data-testid="stSidebarCollapsedControl"] {
-    position: fixed !important;
-    top: 0.75rem !important;
-    left: 0.75rem !important;
-    transform: none !important;
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    pointer-events: auto !important;
-    z-index: 999999 !important;
-    width: 2.6rem !important;
-    height: 2.6rem !important;
-}
-[data-testid="stSidebarCollapsedControl"] > * {
-    transform: none !important;
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-}
-[data-testid="stSidebarCollapsedControl"] button {
-    transform: none !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    border: 2px solid #94a3b8 !important;
-    border-radius: 8px !important;
-    box-shadow: 0 2px 8px rgba(15,23,42,0.2) !important;
-    width: 2.6rem !important;
-    height: 2.6rem !important;
-    min-width: 2.6rem !important;
-    padding: 0 !important;
-    background-color: #ffffff !important;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'%3E%3Ctext x='18' y='26' text-anchor='middle' font-size='22'%3E%E2%AC%85%EF%B8%8F%3C/text%3E%3C/svg%3E") !important;
-    background-repeat: no-repeat !important;
-    background-position: center !important;
-    background-size: 72% !important;
-    cursor: pointer !important;
-}
-[data-testid="stSidebarCollapsedControl"] button:hover {
-    background-color: #f1f5f9 !important;
-    border-color: #0f172a !important;
-    box-shadow: 0 4px 14px rgba(15,23,42,0.3) !important;
-}
-[data-testid="stSidebarCollapsedControl"] button svg { display: none !important; }
-/* Also target alternate selector name used in some Streamlit versions */
-[data-testid="collapsedControl"] {
-    position: fixed !important;
-    top: 0.75rem !important;
-    left: 0.75rem !important;
-    transform: none !important;
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    pointer-events: auto !important;
-    z-index: 999999 !important;
-}
-[data-testid="collapsedControl"] button {
-    transform: none !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    border: 2px solid #94a3b8 !important;
-    border-radius: 8px !important;
-    box-shadow: 0 2px 8px rgba(15,23,42,0.2) !important;
-    width: 2.6rem !important;
-    height: 2.6rem !important;
-    padding: 0 !important;
-    background-color: #ffffff !important;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'%3E%3Ctext x='18' y='26' text-anchor='middle' font-size='22'%3E%E2%AC%85%EF%B8%8F%3C/text%3E%3C/svg%3E") !important;
-    background-repeat: no-repeat !important;
-    background-position: center !important;
-    background-size: 72% !important;
-    cursor: pointer !important;
-}
-[data-testid="collapsedControl"] button svg { display: none !important; }
+/* ── Sidebar OPEN button only — collapsed button handled via components.html ── */
 
 [data-testid="stSidebar"] { background: #ffffff !important; border-right: 1px solid #e2e8f0 !important; }
 [data-testid="stSidebar"] label, [data-testid="stSidebar"] .stSelectbox label {
@@ -803,6 +726,82 @@ div[data-baseweb="select"], div[role="button"], .stSelectbox div { cursor: point
 </style>
 """, unsafe_allow_html=True)
 
+
+
+# ─── SIDEBAR BUTTON FIX (components.html can access window.parent DOM) ──────
+components.html("""
+<script>
+(function() {
+    function fixButtons() {
+        var doc = window.parent.document;
+
+        // --- OPEN button (inside sidebar, click to CLOSE) ---
+        var colBtn = doc.querySelector('[data-testid="stSidebarCollapseButton"] button');
+        if (colBtn && !colBtn.dataset.sarsaFixed) {
+            colBtn.dataset.sarsaFixed = '1';
+            colBtn.style.cssText += ';background-color:#fff!important;border:2px solid #94a3b8!important;border-radius:8px!important;width:2.4rem!important;height:2.4rem!important;min-width:2.4rem!important;padding:0!important;cursor:pointer!important;box-shadow:0 2px 8px rgba(15,23,42,0.18)!important;';
+            var svgs = colBtn.querySelectorAll('svg');
+            svgs.forEach(function(s){ s.style.display='none'; });
+            if (!colBtn.querySelector('.sb-lbl')) {
+                var sp = doc.createElement('span');
+                sp.className = 'sb-lbl';
+                sp.style.cssText = 'font-size:1.15rem;line-height:1;pointer-events:none;display:block;';
+                sp.textContent = '\u27a1\ufe0f';
+                colBtn.appendChild(sp);
+            }
+        }
+
+        // --- CLOSED button (outside sidebar, click to OPEN) ---
+        // Try all known selector variants
+        var selectors = [
+            '[data-testid="stSidebarCollapsedControl"] button',
+            '[data-testid="collapsedControl"] button',
+            'button[kind="header"]',
+            'section[tabindex="-1"] ~ div button',
+        ];
+        var expBtn = null;
+        for (var i = 0; i < selectors.length; i++) {
+            var found = doc.querySelectorAll(selectors[i]);
+            for (var j = 0; j < found.length; j++) {
+                // Must NOT be inside the sidebar itself
+                if (!found[j].closest('[data-testid="stSidebar"]') &&
+                    !found[j].closest('[data-testid="stSidebarCollapseButton"]')) {
+                    expBtn = found[j];
+                    break;
+                }
+            }
+            if (expBtn) break;
+        }
+
+        if (expBtn && !expBtn.dataset.sarsaFixed) {
+            expBtn.dataset.sarsaFixed = '1';
+            expBtn.style.cssText += ';background-color:#fff!important;border:2px solid #94a3b8!important;border-radius:8px!important;width:2.4rem!important;height:2.4rem!important;min-width:2.4rem!important;padding:0!important;cursor:pointer!important;box-shadow:0 2px 8px rgba(15,23,42,0.18)!important;visibility:visible!important;opacity:1!important;';
+            var svgs2 = expBtn.querySelectorAll('svg');
+            svgs2.forEach(function(s){ s.style.display='none'; });
+            if (!expBtn.querySelector('.sb-lbl')) {
+                var sp2 = doc.createElement('span');
+                sp2.className = 'sb-lbl';
+                sp2.style.cssText = 'font-size:1.15rem;line-height:1;pointer-events:none;display:block;';
+                sp2.textContent = '\u2b05\ufe0f';
+                expBtn.appendChild(sp2);
+            }
+            // Also force parent visible
+            var parent = expBtn.parentElement;
+            for (var k = 0; k < 5 && parent; k++) {
+                parent.style.cssText += ';visibility:visible!important;opacity:1!important;display:block!important;';
+                parent = parent.parentElement;
+            }
+        }
+    }
+
+    // Run on load + observe DOM changes
+    fixButtons();
+    var obs = new MutationObserver(fixButtons);
+    obs.observe(window.parent.document.body, { childList: true, subtree: true });
+    [300, 800, 1500, 3000].forEach(function(t){ setTimeout(fixButtons, t); });
+})();
+</script>
+""", height=0, scrolling=False)
 
 # ─── SIDEBAR ─────────────────────────────────────────────────────────────────
 with st.sidebar:
