@@ -614,48 +614,8 @@ span[data-testid="stIconMaterial"] { display: none !important; }
 }
 h1 { color: #0f172a !important; font-weight: 800 !important; text-align: center; }
 
-/* ── Sidebar toggle button — open state (➡️ to close) ── */
-[data-testid="stSidebarCollapseButton"] button {
-    background: #ffffff !important;
-    border: 2px solid #cbd5e1 !important;
-    border-radius: 8px !important;
-    box-shadow: 0 2px 8px rgba(15,23,42,0.18) !important;
-    opacity: 1 !important;
-    visibility: visible !important;
-    width: 2.4rem !important;
-    height: 2.4rem !important;
-    min-width: 2.4rem !important;
-    padding: 0 !important;
-    position: relative !important;
-    transition: all 0.2s ease !important;
-}
-[data-testid="stSidebarCollapseButton"] button:hover {
-    background: #0f172a !important;
-    border-color: #0f172a !important;
-    box-shadow: 0 4px 14px rgba(15,23,42,0.35) !important;
-}
-[data-testid="stSidebarCollapseButton"] button svg {
-    display: none !important;
-    width: 0 !important;
-    height: 0 !important;
-}
-[data-testid="stSidebarCollapseButton"] button::before {
-    content: "➡️";
-    font-size: 1rem;
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    line-height: 1;
-    display: block !important;
-}
-
-/* ── Sidebar toggle button — collapsed state (⬅️ to open) ── */
-[data-testid="stSidebarCollapsedControl"] {
-    display: flex !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-}
+/* ── Sidebar toggle buttons — both states ── */
+[data-testid="stSidebarCollapseButton"] button,
 [data-testid="stSidebarCollapsedControl"] button {
     background: #ffffff !important;
     border: 2px solid #cbd5e1 !important;
@@ -667,28 +627,23 @@ h1 { color: #0f172a !important; font-weight: 800 !important; text-align: center;
     height: 2.4rem !important;
     min-width: 2.4rem !important;
     padding: 0 !important;
-    position: relative !important;
     transition: all 0.2s ease !important;
 }
+[data-testid="stSidebarCollapseButton"] button:hover,
 [data-testid="stSidebarCollapsedControl"] button:hover {
     background: #0f172a !important;
     border-color: #0f172a !important;
     box-shadow: 0 4px 14px rgba(15,23,42,0.35) !important;
 }
+[data-testid="stSidebarCollapseButton"] button svg,
 [data-testid="stSidebarCollapsedControl"] button svg {
     display: none !important;
-    width: 0 !important;
-    height: 0 !important;
 }
-[data-testid="stSidebarCollapsedControl"] button::before {
-    content: "⬅️";
-    font-size: 1rem;
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    line-height: 1;
+[data-testid="stSidebarCollapsedControl"] {
     display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
 }
 
 [data-testid="stSidebar"] { background: #ffffff !important; border-right: 1px solid #e2e8f0 !important; }
@@ -774,6 +729,47 @@ div[data-baseweb="select"], div[role="button"], .stSelectbox div { cursor: point
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 </style>
+""")
+
+
+# ─── SIDEBAR BUTTON EMOJI INJECTION (JS) ────────────────────────────────────
+st.html("""
+<script>
+(function injectSidebarEmojis() {
+    function applyEmojis() {
+        var collapseBtn = document.querySelector('[data-testid="stSidebarCollapseButton"] button');
+        if (collapseBtn) {
+            var svgs = collapseBtn.querySelectorAll('svg');
+            svgs.forEach(function(s){ s.style.display='none'; });
+            if (!collapseBtn.querySelector('.sarsa-emoji')) {
+                var span = document.createElement('span');
+                span.className = 'sarsa-emoji';
+                span.style.cssText = 'font-size:1.1rem;line-height:1;display:block;pointer-events:none;';
+                span.textContent = '\u27a1\ufe0f';
+                collapseBtn.appendChild(span);
+            }
+        }
+        var expandBtn = document.querySelector('[data-testid="stSidebarCollapsedControl"] button');
+        if (expandBtn) {
+            var svgs2 = expandBtn.querySelectorAll('svg');
+            svgs2.forEach(function(s){ s.style.display='none'; });
+            if (!expandBtn.querySelector('.sarsa-emoji')) {
+                var span2 = document.createElement('span');
+                span2.className = 'sarsa-emoji';
+                span2.style.cssText = 'font-size:1.1rem;line-height:1;display:block;pointer-events:none;';
+                span2.textContent = '\u2b05\ufe0f';
+                expandBtn.appendChild(span2);
+            }
+        }
+    }
+    applyEmojis();
+    var observer = new MutationObserver(function(){ applyEmojis(); });
+    observer.observe(document.body, { childList: true, subtree: true });
+    setTimeout(applyEmojis, 500);
+    setTimeout(applyEmojis, 1500);
+    setTimeout(applyEmojis, 3000);
+})();
+</script>
 """)
 
 # ─── SIDEBAR ─────────────────────────────────────────────────────────────────
