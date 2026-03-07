@@ -624,9 +624,9 @@ h1 { color: #0f172a !important; font-weight: 800 !important; text-align: center;
     visibility: visible !important;
     width: 2.4rem !important;
     height: 2.4rem !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
+    min-width: 2.4rem !important;
+    padding: 0 !important;
+    position: relative !important;
     transition: all 0.2s ease !important;
 }
 [data-testid="stSidebarCollapseButton"] button:hover {
@@ -634,18 +634,28 @@ h1 { color: #0f172a !important; font-weight: 800 !important; text-align: center;
     border-color: #0f172a !important;
     box-shadow: 0 4px 14px rgba(15,23,42,0.35) !important;
 }
-/* Hide default SVG when sidebar is open */
 [data-testid="stSidebarCollapseButton"] button svg {
     display: none !important;
+    width: 0 !important;
+    height: 0 !important;
 }
-/* Show ➡️ emoji when sidebar is open (click to close) */
-[data-testid="stSidebarCollapseButton"] button::after {
+[data-testid="stSidebarCollapseButton"] button::before {
     content: "➡️";
-    font-size: 1.1rem;
+    font-size: 1rem;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     line-height: 1;
+    display: block !important;
 }
 
 /* ── Sidebar toggle button — collapsed state (⬅️ to open) ── */
+[data-testid="stSidebarCollapsedControl"] {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
 [data-testid="stSidebarCollapsedControl"] button {
     background: #ffffff !important;
     border: 2px solid #cbd5e1 !important;
@@ -655,9 +665,9 @@ h1 { color: #0f172a !important; font-weight: 800 !important; text-align: center;
     visibility: visible !important;
     width: 2.4rem !important;
     height: 2.4rem !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
+    min-width: 2.4rem !important;
+    padding: 0 !important;
+    position: relative !important;
     transition: all 0.2s ease !important;
 }
 [data-testid="stSidebarCollapsedControl"] button:hover {
@@ -665,15 +675,20 @@ h1 { color: #0f172a !important; font-weight: 800 !important; text-align: center;
     border-color: #0f172a !important;
     box-shadow: 0 4px 14px rgba(15,23,42,0.35) !important;
 }
-/* Hide default SVG when sidebar is collapsed */
 [data-testid="stSidebarCollapsedControl"] button svg {
     display: none !important;
+    width: 0 !important;
+    height: 0 !important;
 }
-/* Show ⬅️ emoji when sidebar is collapsed (click to open) */
-[data-testid="stSidebarCollapsedControl"] button::after {
+[data-testid="stSidebarCollapsedControl"] button::before {
     content: "⬅️";
-    font-size: 1.1rem;
+    font-size: 1rem;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     line-height: 1;
+    display: block !important;
 }
 
 [data-testid="stSidebar"] { background: #ffffff !important; border-right: 1px solid #e2e8f0 !important; }
