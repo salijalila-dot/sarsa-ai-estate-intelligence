@@ -7,7 +7,6 @@ from datetime import datetime
 # ─── AI CONFIGURATION ───────────────────────────────────────────────────────
 GOOGLE_API_KEY = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=GOOGLE_API_KEY)
-
 MODEL_NAME = 'gemini-2.5-flash' 
 model = genai.GenerativeModel(MODEL_NAME)
 
@@ -54,17 +53,17 @@ ui_languages = {
         "audience_opts": ["General Market", "Luxury Buyers", "Investors & ROI Focus", "Expats & Internationals", "First-Time Buyers", "Vacation / Holiday Market", "Commercial Tenants"],
         "custom_inst": "Special Notes & Highlights",
         "custom_inst_ph": "E.g., Private pool, panoramic sea view, smart home, near international school...",
-        "btn": "GENERATE COMPLETE MARKETING ASSETS",
+        "btn": "GENERATE SELECTED ASSETS",
         "upload_label": "Drop Property Photos Here",
         "result": "Executive Preview",
         "loading": "Crafting your premium marketing ecosystem...",
         "empty": "Upload property photos and fill in the details on the left to generate complete professional marketing assets.",
         "download": "Export Section (TXT)",
-        "download_all": "Export ALL Sections (TXT)",
         "save_btn": "Save Changes",
         "saved_msg": "Saved!",
         "error": "Error:",
         "clear_btn": "Reset Form",
+        "select_sections": "Select Assets to Generate",
         "tab_main": "Prime Listing",
         "tab_social": "Social Media Kit",
         "tab_video": "Video Scripts",
@@ -79,12 +78,8 @@ ui_languages = {
         "label_email": "Email Campaign",
         "label_seo": "SEO & Web Copy",
         "label_photo": "Photography Recommendations",
-        "photos_uploaded": "photos loaded",
-        "pro_tip": "Pro Tip: Upload 3-6 photos including exterior, interior, and key features for richest output.",
         "extra_details": "Extra Property Details",
-        "marketing_config": "Marketing Settings",
         "interface_lang": "Interface Language",
-        "config_section": "Configuration",
     },
     "Türkçe": {
         "title": "SarSa AI | Gayrimenkul Zekâ Platformu",
@@ -114,17 +109,17 @@ ui_languages = {
         "audience_opts": ["Genel Pazar", "Lüks Alıcılar", "Yatırımcılar & ROI", "Yabancılar & Uluslararası", "İlk Ev Alıcıları", "Tatil / Kiralık Pazar", "Ticari Kiracılar"],
         "custom_inst": "Özel Notlar ve Öne Çıkan Özellikler",
         "custom_inst_ph": "Örn: Özel havuz, panoramik manzara, akıllı ev sistemi...",
-        "btn": "TÜM PAZARLAMA VARLIKLARINI OLUŞTUR",
+        "btn": "SEÇİLİ VARLIKLARI OLUŞTUR",
         "upload_label": "Fotoğrafları Buraya Bırakın",
         "result": "Yönetici Önizlemesi",
         "loading": "Premium pazarlama ekosisteminiz hazırlanıyor...",
         "empty": "Profesyonel analiz için görsel bekleniyor. Fotoğrafları yükleyin ve soldaki bilgileri doldurun.",
         "download": "Bölümü İndir (TXT)",
-        "download_all": "Tüm Bölümleri Dışarı Aktar (TXT)",
         "save_btn": "Kaydet",
         "saved_msg": "Kaydedildi!",
         "error": "Hata:",
         "clear_btn": "Formu Temizle",
+        "select_sections": "Oluşturulacak Bölümleri Seçin",
         "tab_main": "Ana İlan",
         "tab_social": "Sosyal Medya Kiti",
         "tab_video": "Video Senaryoları",
@@ -139,12 +134,8 @@ ui_languages = {
         "label_email": "E-posta Kampanyası",
         "label_seo": "SEO & Web Metni",
         "label_photo": "Fotoğraf Tavsiyeleri",
-        "photos_uploaded": "fotoğraf yüklendi",
-        "pro_tip": "İpucu: En iyi sonuç için dış mekan, iç mekan ve önemli özellikleri içeren 3-6 fotoğraf yükleyin.",
         "extra_details": "Ek Mülk Detayları",
-        "marketing_config": "Pazarlama Ayarları",
         "interface_lang": "Arayüz Dili",
-        "config_section": "Yapılandırma",
     },
     "Español": {
         "title": "SarSa AI | Plataforma de Inteligencia Inmobiliaria",
@@ -174,17 +165,17 @@ ui_languages = {
         "audience_opts": ["Mercado General", "Compradores de Lujo", "Inversores & ROI", "Extranjeros & Internacionales", "Primeros Compradores", "Mercado Vacacional", "Inquilinos Comerciales"],
         "custom_inst": "Notas Especiales y Características",
         "custom_inst_ph": "Ej: Piscina privada, vistas al mar, domótica...",
-        "btn": "GENERAR ACTIVOS DE MARKETING COMPLETOS",
+        "btn": "GENERAR ACTIVOS SELECCIONADOS",
         "upload_label": "Subir Fotos de la Propiedad",
         "result": "Vista Previa Ejecutiva",
         "loading": "Creando su ecosistema de marketing premium...",
         "empty": "Esperando imágenes para análisis profesional. Suba fotos y complete los detalles a la izquierda.",
         "download": "Exportar Sección (TXT)",
-        "download_all": "Exportar TODO (TXT)",
         "save_btn": "Guardar Cambios",
         "saved_msg": "¡Guardado!",
         "error": "Error:",
         "clear_btn": "Limpiar Formulario",
+        "select_sections": "Seleccionar Secciones a Generar",
         "tab_main": "Anuncio Premium",
         "tab_social": "Kit de Redes Sociales",
         "tab_video": "Guiones de Video",
@@ -199,12 +190,8 @@ ui_languages = {
         "label_email": "Campaña de Email",
         "label_seo": "SEO & Web Copy",
         "label_photo": "Recomendaciones de Fotografía",
-        "photos_uploaded": "fotos cargadas",
-        "pro_tip": "Consejo Pro: Sube 3-6 fotos incluyendo exterior, interior y características clave.",
         "extra_details": "Detalles Adicionales",
-        "marketing_config": "Configuración de Marketing",
         "interface_lang": "Idioma de Interfaz",
-        "config_section": "Configuración",
     },
     "Deutsch": {
         "title": "SarSa AI | Immobilien-Intelligenz-Plattform",
@@ -234,17 +221,17 @@ ui_languages = {
         "audience_opts": ["Allgemeiner Markt", "Luxuskäufer", "Investoren & ROI", "Expats & Internationale", "Erstkäufer", "Ferienmarkt", "Gewerbemieter"],
         "custom_inst": "Notizen & Besonderheiten",
         "custom_inst_ph": "Z.B. Privatpool, Panoramasicht, Smart-Home...",
-        "btn": "KOMPLETTE MARKETING-ASSETS ERSTELLEN",
+        "btn": "AUSGEWÄHLTE ASSETS ERSTELLEN",
         "upload_label": "Fotos hier hochladen",
         "result": "Executive-Vorschau",
         "loading": "Ihr Marketing-Ökosystem wird erstellt...",
         "empty": "Warte auf Bilder für die Analyse. Laden Sie Fotos hoch und füllen Sie die Details aus.",
         "download": "Abschnitt Exportieren (TXT)",
-        "download_all": "ALLES Exportieren (TXT)",
         "save_btn": "Speichern",
         "saved_msg": "Gespeichert!",
         "error": "Fehler:",
         "clear_btn": "Formular Zurücksetzen",
+        "select_sections": "Zu erstellende Bereiche wählen",
         "tab_main": "Premium-Exposé",
         "tab_social": "Social Media Kit",
         "tab_video": "Videoskripte",
@@ -259,12 +246,8 @@ ui_languages = {
         "label_email": "E-Mail-Kampagne",
         "label_seo": "SEO & Webtext",
         "label_photo": "Fotografie-Empfehlungen",
-        "photos_uploaded": "Fotos geladen",
-        "pro_tip": "Tipp: Laden Sie 3-6 Fotos mit Außen-, Innenansichten und Highlights hoch.",
         "extra_details": "Weitere Details",
-        "marketing_config": "Marketing-Einstellungen",
         "interface_lang": "Oberfläche Sprache",
-        "config_section": "Konfiguration",
     },
     "Français": {
         "title": "SarSa AI | Plateforme d'Intelligence Immobilière",
@@ -294,17 +277,17 @@ ui_languages = {
         "audience_opts": ["Marché Général", "Acheteurs de Luxe", "Investisseurs & ROI", "Expatriés & Internationaux", "Primo-Accédants", "Marché Vacances", "Locataires Commerciaux"],
         "custom_inst": "Notes Spéciales & Points Forts",
         "custom_inst_ph": "Ex: Piscine privée, vue panoramique, domotique...",
-        "btn": "GÉNÉRER LES ACTIFS MARKETING COMPLETS",
+        "btn": "GÉNÉRER LES ACTIFS SÉLECTIONNÉS",
         "upload_label": "Déposer les Photos Ici",
         "result": "Aperçu Exécutif",
         "loading": "Préparation de votre écosystème marketing...",
         "empty": "En attente d'images pour analyse. Déposez des photos et remplissez les détails à gauche.",
         "download": "Exporter Section (TXT)",
-        "download_all": "Exporter TOUT (TXT)",
         "save_btn": "Enregistrer",
         "saved_msg": "Enregistré !",
         "error": "Erreur :",
         "clear_btn": "Réinitialiser",
+        "select_sections": "Sélectionner les sections à générer",
         "tab_main": "Annonce Premium",
         "tab_social": "Kit Réseaux Sociaux",
         "tab_video": "Scripts Vidéo",
@@ -319,12 +302,8 @@ ui_languages = {
         "label_email": "Campagne Email",
         "label_seo": "SEO & Web Copy",
         "label_photo": "Recommandations Photographiques",
-        "photos_uploaded": "photos chargées",
-        "pro_tip": "Conseil Pro: Téléchargez 3 à 6 photos incluant l'extérieur, l'intérieur et les atouts.",
         "extra_details": "Détails Supplémentaires",
-        "marketing_config": "Paramètres Marketing",
         "interface_lang": "Langue Interface",
-        "config_section": "Configuration",
     },
     "Português": {
         "title": "SarSa AI | Plataforma de Inteligência Imobiliária",
@@ -354,17 +333,17 @@ ui_languages = {
         "audience_opts": ["Mercado Geral", "Compradores de Luxo", "Investidores & ROI", "Expats e Internacionais", "Primeiros Compradores", "Mercado de Férias", "Inquilinos Comerciais"],
         "custom_inst": "Notas Especiais e Destaques",
         "custom_inst_ph": "Ex: Piscina privativa, vista panorâmica, casa inteligente...",
-        "btn": "GERAR ATIVOS DE MARKETING COMPLETOS",
+        "btn": "GERAR ATIVOS SELECIONADOS",
         "upload_label": "Enviar Fotos do Imóvel",
         "result": "Pré-visualização Executiva",
         "loading": "Preparando seu ecossistema de marketing...",
         "empty": "Aguardando imagens para análise. Envie fotos e preencha os detalhes à esquerda.",
         "download": "Exportar Secção (TXT)",
-        "download_all": "Exportar TUDO (TXT)",
         "save_btn": "Salvar Alterações",
         "saved_msg": "Salvo!",
         "error": "Erro:",
         "clear_btn": "Limpar Formulário",
+        "select_sections": "Selecionar Seções a Gerar",
         "tab_main": "Anúncio Premium",
         "tab_social": "Kit Redes Sociais",
         "tab_video": "Roteiros de Vídeo",
@@ -379,12 +358,8 @@ ui_languages = {
         "label_email": "Campanha Email",
         "label_seo": "SEO & Web Copy",
         "label_photo": "Recomendações de Fotografia",
-        "photos_uploaded": "fotos carregadas",
-        "pro_tip": "Dica Pro: Envie 3-6 fotos incluindo exterior, interior e características principais.",
         "extra_details": "Detalhes Adicionais",
-        "marketing_config": "Configurações de Marketing",
         "interface_lang": "Idioma Interface",
-        "config_section": "Configuração",
     },
     "日本語": {
         "title": "SarSa AI | 不動産インテリジェンス・プラットフォーム",
@@ -414,17 +389,17 @@ ui_languages = {
         "audience_opts": ["一般市場", "富裕層バイヤー", "投資家 & ROI重視", "海外居住者", "初めての購入者", "休暇・別荘市場", "商業テナント"],
         "custom_inst": "特記事項 ＆ アピールポイント",
         "custom_inst_ph": "例: プライベートプール、パノラマビュー、スマートホーム...",
-        "btn": "完全なマーケティング資産を生成",
+        "btn": "選択した資産を生成",
         "upload_label": "ここに物件写真をアップロード",
         "result": "エグゼクティブ・プレビュー",
         "loading": "プレミアム・マーケティング・エコシステムを構築中...",
         "empty": "分析用の画像を待機中。写真をアップロードし、左側に詳細を入力してください。",
         "download": "セクションを書き出し (TXT)",
-        "download_all": "全セクション書き出し (TXT)",
         "save_btn": "変更を保存",
         "saved_msg": "保存完了！",
         "error": "エラー:",
         "clear_btn": "フォームをリセット",
+        "select_sections": "生成するセクションを選択",
         "tab_main": "プレミアム広告",
         "tab_social": "SNSキット",
         "tab_video": "動画台本",
@@ -439,12 +414,8 @@ ui_languages = {
         "label_email": "メールキャンペーン",
         "label_seo": "SEOテキスト",
         "label_photo": "撮影のアドバイス",
-        "photos_uploaded": "枚の写真が読み込まれました",
-        "pro_tip": "ヒント: 外観、内装、主要な特徴を含む3〜6枚の写真をアップロードすると、最高の解析結果が得られます。",
         "extra_details": "物件詳細情報",
-        "marketing_config": "マーケティング設定",
         "interface_lang": "インターフェース言語",
-        "config_section": "設定",
     },
     "简体中文": {
         "title": "SarSa AI | 房地产智能平台",
@@ -474,17 +445,17 @@ ui_languages = {
         "audience_opts": ["大众市场", "豪宅买家", "投资者 & 投资回报", "外籍人士", "首次购房者", "度假市场", "商业租客"],
         "custom_inst": "特别备注与亮点",
         "custom_inst_ph": "例如：私人泳池、全景海景、智能家居、临近国际学校...",
-        "btn": "生成完整营销资产",
+        "btn": "生成所选资产",
         "upload_label": "在此上传房产照片",
         "result": "高级预览",
         "loading": "正在打造您的专属营销生态系统...",
         "empty": "等待照片进行专业分析。请上传照片并在左侧填写详细信息。",
         "download": "导出此部分 (TXT)",
-        "download_all": "导出全部内容 (TXT)",
         "save_btn": "保存更改",
         "saved_msg": "已保存！",
         "error": "错误：",
         "clear_btn": "重置表单",
+        "select_sections": "选择要生成的章节",
         "tab_main": "优质房源",
         "tab_social": "社媒包",
         "tab_video": "视频脚本",
@@ -499,12 +470,8 @@ ui_languages = {
         "label_email": "邮件营销",
         "label_seo": "SEO 文案",
         "label_photo": "摄影建议",
-        "photos_uploaded": "张照片已加载",
-        "pro_tip": "提示：上传 3-6 张包含外观、内饰和核心特征的照片以获得最佳效果。",
         "extra_details": "额外房产细节",
-        "marketing_config": "营销设置",
         "interface_lang": "界面语言",
-        "config_section": "配置",
     },
     "العربية": {
         "title": "SarSa AI | منصة الذكاء العقاري",
@@ -534,17 +501,17 @@ ui_languages = {
         "audience_opts": ["السوق العام", "مشتري الفخامة", "المستثمرون", "المغتربون", "مشتري لأول مرة", "سوق العطلات", "مستأجر تجاري"],
         "custom_inst": "ملاحظات خاصة ومميزات",
         "custom_inst_ph": "مثال: مسبح خاص، إطلالة بانورامية، منزل ذكي...",
-        "btn": "إنشاء الأصول التسويقية الكاملة",
+        "btn": "إنشاء الأصول المختارة",
         "upload_label": "ضع صور العقار هنا",
         "result": "معاينة تنفيذية",
         "loading": "جاري تجهيز منظومتك التسويقية الفاخرة...",
         "empty": "في انتظار الصور لبدء التحليل المهني. ارفع الصور واملأ التفاصيل على اليسار.",
         "download": "تصدير القسم (TXT)",
-        "download_all": "تصدير الكل (TXT)",
         "save_btn": "حفظ التغييرات",
         "saved_msg": "تم الحفظ!",
         "error": "خطأ:",
         "clear_btn": "إعادة تعيين",
+        "select_sections": "اختر الأقسام المراد إنشاؤها",
         "tab_main": "الإعلان الرئيسي",
         "tab_social": "حقيبة التواصل",
         "tab_video": "سيناريو الفيديو",
@@ -559,12 +526,8 @@ ui_languages = {
         "label_email": "حملة البريد الإلكتروني",
         "label_seo": "نص SEO",
         "label_photo": "توصيات التصوير الفوتوغرافي",
-        "photos_uploaded": "صور تم تحميلها",
-        "pro_tip": "نصيحة: ارفع 3-6 صور تشمل التصميم الخارجي والداخلي والمميزات الرئيسية لأفضل النتائج.",
         "extra_details": "تفاصيل العقار الإضافية",
-        "marketing_config": "إعدادات التسويق",
         "interface_lang": "لغة الواجهة",
-        "config_section": "الإعدادات",
     },
 }
 
@@ -574,7 +537,7 @@ for key, val in [
     ("location", ""), ("tone", ""), ("custom_inst", ""),
     ("target_lang_input", "English"), ("bedrooms", ""),
     ("bathrooms", ""), ("area_size", ""), ("year_built", ""),
-    ("furnishing_idx", 0), ("audience_idx", 0),
+    ("furnishing_idx", 0), ("audience_idx", 0), ("selected_sections", [])
 ]:
     if key not in st.session_state:
         st.session_state[key] = val
@@ -659,6 +622,20 @@ with st.sidebar:
     st.session_state.tone = st.selectbox(t["tone"], t["tones"], index=current_tone_idx)
     st.session_state.custom_inst = st.text_area(f"📝 {t['custom_inst']}", value=st.session_state.custom_inst, placeholder=t["custom_inst_ph"], height=100)
 
+    st.markdown(f"<div style='font-size:0.68rem; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:1.4px; padding:0.6rem 0 0.3rem 0; border-bottom:1px solid #f1f5f9; margin-bottom:0.4rem;'>🛠️ {t['select_sections']}</div>", unsafe_allow_html=True)
+    
+    available_sections = {
+        "1": t["tab_main"], "2": t["tab_social"], "3": t["tab_video"], 
+        "4": t["tab_tech"], "5": t["tab_email"], "6": t["tab_seo"], "7": t["tab_photo"]
+    }
+    
+    # Selection logic: default to all if none selected
+    st.session_state.selected_sections = st.multiselect(
+        "", options=list(available_sections.keys()), 
+        format_func=lambda x: available_sections[x],
+        default=st.session_state.selected_sections if st.session_state.selected_sections else list(available_sections.keys())
+    )
+
     st.markdown(f"<div style='font-size:0.68rem; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:1.4px; padding:0.6rem 0 0.3rem 0; border-bottom:1px solid #f1f5f9; margin-bottom:0.4rem;'>🔑 {t['extra_details']}</div>", unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
@@ -673,6 +650,7 @@ with st.sidebar:
 
     if st.button(f"🗑️ {t['clear_btn']}", use_container_width=True):
         for k in ["uretilen_ilan", "prop_type", "price", "location", "bedrooms", "bathrooms", "area_size", "year_built", "custom_inst"]: st.session_state[k] = ""
+        st.session_state.selected_sections = []
         st.rerun()
 
 # ─── MAIN CONTENT ─────────────────────────────────────────────────────────────
@@ -693,33 +671,24 @@ if uploaded_files:
             p_aud = t["audience_opts"][st.session_state.audience_idx]
             details = f"Type: {st.session_state.prop_type}, Loc: {st.session_state.location}, Price: {st.session_state.price}, Beds: {st.session_state.bedrooms}, Baths: {st.session_state.bathrooms}, Area: {st.session_state.area_size}, Year: {st.session_state.year_built}, Furn: {p_furn}, Audience: {p_aud}, Tone: {st.session_state.tone}, Notes: {st.session_state.custom_inst}"
             
-            prompt = f"""You are a world-class AI Real Estate Copywriter. Write ALL content in {st.session_state.target_lang_input}.
-            CRITICAL INSTRUCTION: You MUST write full, comprehensive content for ALL 7 sections. Do not skip or summarize any section, especially Sections 5 and 6. Provide the complete text.
+            section_prompts = {
+                "1": "## SECTION_1\n[Write the full PRIME LISTING here - minimum 600 words]",
+                "2": "## SECTION_2\n[Write the complete SOCIAL MEDIA KIT here - Posts for IG, FB, LinkedIn, TikTok]",
+                "3": "## SECTION_3\n[Write the full CINEMATIC VIDEO SCRIPT here]",
+                "4": "## SECTION_4\n[Write the full TECHNICAL SPECIFICATIONS here]",
+                "5": "## SECTION_5\n[Write the full EMAIL CAMPAIGN here - 3 complete email templates]",
+                "6": "## SECTION_6\n[Write the full SEO & WEB COPY here - Metadata, keywords, Ads copy]",
+                "7": "## SECTION_7\n[Write the full PHOTOGRAPHY RECOMMENDATIONS here]"
+            }
             
+            active_prompts = "\n\n".join([section_prompts[s] for s in st.session_state.selected_sections])
+
+            prompt = f"""You are a world-class AI Real Estate Copywriter. Write ALL content in {st.session_state.target_lang_input}.
             PROPERTY DETAILS: {details}
 
-            Analyze the photos and use exactly these headers, writing the extensive content below each one:
+            Analyze the photos and write extensive content ONLY for the following sections as requested:
 
-            ## SECTION_1
-            [Write the full PRIME LISTING here - minimum 600 words]
-
-            ## SECTION_2
-            [Write the complete SOCIAL MEDIA KIT here - Posts for IG, FB, LinkedIn, TikTok]
-
-            ## SECTION_3
-            [Write the full CINEMATIC VIDEO SCRIPT here]
-
-            ## SECTION_4
-            [Write the full TECHNICAL SPECIFICATIONS here]
-
-            ## SECTION_5
-            [Write the full EMAIL CAMPAIGN here - 3 complete email templates (Alert, Pitch, Follow-up)]
-
-            ## SECTION_6
-            [Write the full SEO & WEB COPY here - Metadata, keywords, Ads copy]
-
-            ## SECTION_7
-            [Write the full PHOTOGRAPHY RECOMMENDATIONS here - Missing angles, staging advice]"""
+            {active_prompts}"""
             
             try:
                 response = model.generate_content([prompt] + images_for_ai)
@@ -731,35 +700,35 @@ if uploaded_files:
         raw = st.session_state.uretilen_ilan
         sec = {str(i): "" for i in range(1, 8)}
         
-        # Extremely robust parsing logic to prevent skipped lines
         for p in raw.split("##"):
             p = p.strip()
             for n in ["1", "2", "3", "4", "5", "6", "7"]:
                 if p.upper().startswith(f"SECTION_{n}"):
                     content = p[len(f"SECTION_{n}"):].strip()
-                    # Clean up if AI left a dash or title on the same line
                     if content.startswith("—") or content.startswith("-") or content.startswith(":"):
                         content = content.lstrip("—-–: \n").strip()
                     sec[n] = content
                     break
 
-        tabs = st.tabs([f"📝 {t['tab_main']}", f"📱 {t['tab_social']}", f"🎬 {t['tab_video']}", f"⚙️ {t['tab_tech']}", f"✉️ {t['tab_email']}", f"🔍 {t['tab_seo']}", f"📸 {t['tab_photo']}"])
-        labels = [t["label_main"], t["label_social"], t["label_video"], t["label_tech"], t["label_email"], t["label_seo"], t["label_photo"]]
-        ts = datetime.now().strftime("%Y%m%d_%H%M")
-        
-        for i, tab in enumerate(tabs):
-            with tab:
-                idx = str(i+1)
-                edited = st.text_area(labels[i], value=sec[idx], height=450, key=f"txt_{idx}")
-                c1, c2 = st.columns(2)
-                with c1: 
-                    if st.button(f"💾 {t['save_btn']}", key=f"save_{idx}"): st.success(t['saved_msg'])
-                with c2: 
-                    st.download_button(f"📥 {t['download']}", edited, file_name=f"sarsa_{idx}_{ts}.txt", key=f"dl_{idx}")
-
-        st.download_button(label=f"📥 {t['download_all']}", data=raw, file_name=f"sarsa_complete_{ts}.txt", use_container_width=True)
+        # Only show tabs that were selected and have content
+        active_tabs_indices = [int(i)-1 for i in st.session_state.selected_sections if sec[i]]
+        if active_tabs_indices:
+            tab_labels = [f"📝 {t['tab_main']}", f"📱 {t['tab_social']}", f"🎬 {t['tab_video']}", f"⚙️ {t['tab_tech']}", f"✉️ {t['tab_email']}", f"🔍 {t['tab_seo']}", f"📸 {t['tab_photo']}"]
+            ui_labels = [t["label_main"], t["label_social"], t["label_video"], t["label_tech"], t["label_email"], t["label_seo"], t["label_photo"]]
+            
+            tabs = st.tabs([tab_labels[i] for i in active_tabs_indices])
+            ts = datetime.now().strftime("%Y%m%d_%H%M")
+            
+            for i, tab_idx in enumerate(active_tabs_indices):
+                with tabs[i]:
+                    idx = str(tab_idx + 1)
+                    edited = st.text_area(ui_labels[tab_idx], value=sec[idx], height=450, key=f"txt_{idx}")
+                    c1, c2 = st.columns(2)
+                    with c1: 
+                        if st.button(f"💾 {t['save_btn']}", key=f"save_{idx}"): st.success(t['saved_msg'])
+                    with c2: 
+                        st.download_button(f"📥 {t['download']}", edited, file_name=f"sarsa_{idx}_{ts}.txt", key=f"dl_{idx}")
 else:
-    # ── EMPTY STATE ──
     st.markdown(f"""
     <div style="text-align:center;padding:4rem 2rem;color:#94a3b8;
     border:2px dashed #e2e8f0;border-radius:16px;background:#fafbfc;">
