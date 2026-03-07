@@ -5,7 +5,6 @@ import os
 from datetime import datetime
 
 # ─── AI CONFIGURATION ───────────────────────────────────────────────────────
-# API Key erişimi düzeltildi
 GOOGLE_API_KEY = st.secrets
 genai.configure(api_key=GOOGLE_API_KEY)
 MODEL_NAME = 'gemini-2.5-flash'
@@ -24,7 +23,7 @@ def load_logo(file_path):
         return Image.open(file_path)
     return None
 
-# ─── LANGUAGE SYSTEM (Fixed Syntax Error) ───────────────────────────────────
+# ─── LANGUAGE SYSTEM ────────────────────────────────────────────────────────
 ui_languages = {
     "English": {
         "title": "SarSa AI | Real Estate Intelligence Platform",
@@ -65,7 +64,7 @@ ui_languages = {
         "saved_msg": "Saved!",
         "error": "Error:",
         "err_connection": "Connection Error: Could not reach the AI service. Please check your internet connection.",
-        "err_quota": "Quota Exceeded: The service is temporarily at capacity. Please try again in a minute.",
+        "err_quota": "API Quota Exceeded: The service is temporarily at capacity. Please wait a moment.",
         "err_image": "Image Error: One or more photos could not be processed. Use clear JPG/PNG files.",
         "err_generic": "An unexpected error occurred. Please try again.",
         "clear_btn": "Reset Form",
@@ -126,8 +125,8 @@ ui_languages = {
         "save_btn": "Kaydet",
         "saved_msg": "Kaydedildi!",
         "error": "Hata:",
-        "err_connection": "Bağlantı Hatası: AI servisine ulaşılamadı. İnternetinizi kontrol edin.",
-        "err_quota": "API Kotası Aşıldı: Servis geçici olarak dolu. Lütfen bir dakika sonra tekrar deneyin.",
+        "err_connection": "Bağlantı Hatası: AI servisine ulaşılamadı. İnternet bağlantınızı kontrol edin.",
+        "err_quota": "API Kotası Aşıldı: Servis geçici olarak dolu. Lütfen biraz bekleyip tekrar deneyin.",
         "err_image": "Görsel Hatası: Fotoğraflar işlenemedi. Lütfen net JPG/PNG dosyaları kullanın.",
         "err_generic": "Beklenmedik bir hata oluştu. Lütfen tekrar deneyin.",
         "clear_btn": "Formu Temizle",
@@ -145,11 +144,11 @@ ui_languages = {
         "label_seo": "SEO & Web Metni",
         "photos_uploaded": "fotoğraf yüklendi",
         "pro_tip": "İpucu: En iyi sonuç için dış mekan, iç mekan ve önemli özellikleri içeren 3-6 fotoğraf yükleyin.",
-        "extra_details": "Ek Mülk Detaylari",
+        "extra_details": "Ek Mülk Detayları",
         "marketing_config": "Pazarlama Ayarları",
         "interface_lang": "Arayüz Dili",
         "config_section": "Yapılandırma",
-    },
+    }
 }
 
 # ─── SESSION STATE ───────────────────────────────────────────────────────────
@@ -174,38 +173,39 @@ div[data-testid="stInputInstructions"] { display: none!important; }
 span[data-testid="stIconMaterial"] { display: none!important; }
 
 /* ── PRO SIDEBAR BUTTONS (CUSTOM EMOJIS) ── */
-/* 1. Sidebar Kapatma Butonu (Sidebar açıkken) */
+/* 1. Sidebar Kapatma Butonu (Açıkken Sidebar içindeki buton) */
  button {
     background-color: #0f172a!important;
     border: 1px solid #1e293b!important;
-    border-radius: 8px!important;
-    width: 2.5rem!important;
-    height: 2.5rem!important;
+    border-radius: 10px!important;
+    width: 2.4rem!important;
+    height: 2.4rem!important;
     display: flex!important;
     align-items: center!important;
     justify-content: center!important;
+    transition: all 0.3s ease!important;
 }
  button:after {
     content: "➡️"!important;
-    font-size: 1.2rem!important;
+    font-size: 1.1rem!important;
 }
  button svg { display: none!important; }
 
-/* 2. Sidebar Açma Butonu (Sidebar kapalıyken) */
+/* 2. Sidebar Açma Butonu (Kapalıyken dışarıdaki buton) */
  button {
     background-color: #0f172a!important;
     border: 1px solid #1e293b!important;
-    border-radius: 8px!important;
-    width: 2.5rem!important;
-    height: 2.5rem!important;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2)!important;
+    border-radius: 10px!important;
+    width: 2.4rem!important;
+    height: 2.4rem!important;
+    box-shadow: 0 4px 15px rgba(15,23,42,0.25)!important;
     display: flex!important;
     align-items: center!important;
     justify-content: center!important;
 }
  button:after {
     content: "⬅️"!important;
-    font-size: 1.2rem!important;
+    font-size: 1.1rem!important;
 }
  button svg { display: none!important; }
 
@@ -217,6 +217,10 @@ span[data-testid="stIconMaterial"] { display: none!important; }
 h1 { color: #0f172a!important; font-weight: 800!important; text-align: center; }
 
  { background: #ffffff!important; border-right: 1px solid #e2e8f0!important; }
+ label {
+    font-size: 0.74rem!important; font-weight: 700!important;
+    color: #64748b!important; text-transform: uppercase!important; letter-spacing: 0.7px!important;
+}
 
 .stButton > button {
     background: #0f172a!important; color: white!important;
@@ -226,10 +230,18 @@ h1 { color: #0f172a!important; font-weight: 800!important; text-align: center; }
     transition: all 0.25s ease!important;
     box-shadow: 0 4px 15px rgba(15,23,42,0.3)!important;
 }
+.stButton > button:hover {
+    background: #1e293b!important; transform: translateY(-1px)!important;
+}
 
 .stTabs [aria-selected="true"] {
     background-color: #0f172a!important; color: white!important;
     border-radius: 8px 8px 0 0!important;
+}
+
+[data-testid="stFileUploader"] {
+    border-radius: 14px!important; border: 2px dashed #cbd5e1!important;
+    background: #f8fafc!important; transition: all 0.3s!important; padding: 1rem!important;
 }
 </style>
 """)
@@ -250,6 +262,7 @@ with st.sidebar:
         </div>""")
 
     st.markdown("<br>", unsafe_allow_html=True)
+
     current_ui_lang = st.selectbox("🌐 Interface Language", list(ui_languages.keys()), index=0)
     t = ui_languages[current_ui_lang]
 
@@ -261,9 +274,9 @@ with st.sidebar:
     st.session_state.price = st.text_input(t["price"], value=st.session_state.price, placeholder=t["ph_price"])
     st.session_state.location = st.text_input(t["location"], value=st.session_state.location, placeholder=t["ph_loc"])
 
-    tones = t["tones"]
-    current_tone_idx = tones.index(st.session_state.tone) if st.session_state.tone in tones else 0
-    st.session_state.tone = st.selectbox(t["tone"], tones, index=current_tone_idx)
+    tones_list = t["tones"]
+    current_tone_idx = tones_list.index(st.session_state.tone) if st.session_state.tone in tones_list else 0
+    st.session_state.tone = st.selectbox(t["tone"], tones_list, index=current_tone_idx)
 
     st.session_state.custom_inst = st.text_area(f"📝 {t['custom_inst']}", value=st.session_state.custom_inst, placeholder=t["custom_inst_ph"], height=100)
 
@@ -277,13 +290,13 @@ with st.sidebar:
     with col3: st.session_state.area_size = st.text_input(t["area"], value=st.session_state.area_size, placeholder=t["ph_area"])
     with col4: st.session_state.year_built = st.text_input(t["year_built"], value=st.session_state.year_built, placeholder=t["ph_year"])
 
-    furnishing_opts = t["furnishing_opts"]
-    furnishing_sel = st.selectbox(t["furnishing"], furnishing_opts, index=st.session_state.furnishing_idx)
-    st.session_state.furnishing_idx = furnishing_opts.index(furnishing_sel)
+    f_opts = t["furnishing_opts"]
+    f_sel = st.selectbox(t["furnishing"], f_opts, index=st.session_state.furnishing_idx)
+    st.session_state.furnishing_idx = f_opts.index(f_sel)
 
-    audience_opts = t["audience_opts"]
-    audience_sel = st.selectbox(t["target_audience"], audience_opts, index=st.session_state.audience_idx)
-    st.session_state.audience_idx = audience_opts.index(audience_sel)
+    a_opts = t["audience_opts"]
+    a_sel = st.selectbox(t["target_audience"], a_opts, index=st.session_state.audience_idx)
+    st.session_state.audience_idx = a_opts.index(a_sel)
 
     st.html(f"""<div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:0.7rem 1rem; font-size:0.78rem; color:#1e40af; margin-top:0.8rem; line-height:1.5;">💡 {t['pro_tip']}</div>""")
 
@@ -303,12 +316,12 @@ st.html(f"<div style='text-align:center; color:#64748b; font-size:1rem; max-widt
 uploaded_files = st.file_uploader(f"📸 {t['upload_label']}", type=["jpg", "png", "webp", "jpeg"], accept_multiple_files=True)
 
 if uploaded_files:
-    images_for_ai = [Image.open(f) for f in uploaded_files]
-    n = len(images_for_ai)
+    imgs = [Image.open(f) for f in uploaded_files]
+    n = len(imgs)
     st.html(f"<div style='display:inline-flex;align-items:center;gap:6px;background:#dbeafe;color:#1d4ed8;border-radius:20px;padding:4px 12px;font-size:0.78rem;font-weight:700;margin-bottom:0.8rem;'>📷 {n} {t['photos_uploaded']}</div>")
 
     cols = st.columns(min(n, 4))
-    for i, img in enumerate(images_for_ai):
+    for i, img in enumerate(imgs):
         with cols[i % min(n, 4)]: st.image(img, use_container_width=True)
 
     if st.button(f"🚀 {t['btn']}"):
@@ -316,21 +329,20 @@ if uploaded_files:
             p_type  = st.session_state.prop_type or "Property"
             p_loc   = st.session_state.location or "Undisclosed Location"
             p_price = st.session_state.price or "Price upon request"
-            p_furn  = furnishing_sel if furnishing_sel!= t["furnishing_opts"] else "Not specified"
-            p_aud   = audience_sel if audience_sel!= t["audience_opts"] else "General Market"
+            p_furn  = f_sel if f_sel!= f_opts else "Not specified"
+            p_aud   = a_sel if a_sel!= a_opts else "General Market"
 
-            details = f"PROPERTY DETAILS:\n- Type: {p_type}\n- Location: {p_loc}\n- Price: {p_price}\n- Bedrooms: {st.session_state.bedrooms}\n- Bathrooms: {st.session_state.bathrooms}\n- Area: {st.session_state.area_size}\n- Year: {st.session_state.year_built}\n- Furnishing: {p_furn}\n- Audience: {p_aud}\n- Tone: {st.session_state.tone}"
-            
-            prompt = f"You are a Senior Real Estate Strategist for SarSa AI. OUTPUT LANGUAGE: {st.session_state.target_lang_input}. {details}. Generate 6 SECTIONS: SECTION_1 (Listing), SECTION_2 (Social Kit), SECTION_3 (Video Script), SECTION_4 (Tech Specs), SECTION_5 (Email), SECTION_6 (SEO)."
+            details = f"PROPERTY DETAILS:\n- Type: {p_type}\n- Location: {p_loc}\n- Price: {p_price}\n- Bedrooms: {st.session_state.bedrooms}\n- Bathrooms: {st.session_state.bathrooms}\n- Area: {st.session_state.area_size}\n- Year: {st.session_state.year_built}\n- Furnishing: {p_furn}\n- Audience: {p_aud}\n- Strategy: {st.session_state.tone}"
+            prompt = f"You are a Senior Real Estate Strategist for SarSa AI. OUTPUT LANGUAGE: {st.session_state.target_lang_input}. {details}. Analyze photos and generate 6 SECTIONS: SECTION_1 (Listing), SECTION_2 (Social Kit), SECTION_3 (Video Script), SECTION_4 (Tech Specs), SECTION_5 (Email), SECTION_6 (SEO)."
 
             try:
-                response = model.generate_content([prompt] + images_for_ai)
+                response = model.generate_content([prompt] + imgs)
                 st.session_state.uretilen_ilan = response.text
             except Exception as e:
-                err_msg = str(e).lower()
-                if "quota" in err_msg: st.error(t["err_quota"])
-                elif "connection" in err_msg: st.error(t["err_connection"])
-                elif "image" in err_msg: st.error(t["err_image"])
+                err_str = str(e).lower()
+                if any(k in err_str for k in ["connection", "network", "timeout"]): st.error(t["err_connection"])
+                elif "quota" in err_str: st.warning(t["err_quota"])
+                elif "image" in err_str: st.error(t["err_image"])
                 else: st.error(f"{t['err_generic']} ({str(e)})")
 
     if st.session_state.uretilen_ilan:
@@ -338,11 +350,11 @@ if uploaded_files:
         sec = {str(i): "" for i in range(1, 7)}
         for p in raw.split("##"):
             p = p.strip()
-            for n in ["1", "2", "3", "4", "5", "6"]:
-                if p.startswith(f"SECTION_{n}"):
+            for n_sec in ["1", "2", "3", "4", "5", "6"]:
+                if p.startswith(f"SECTION_{n_sec}"):
                     content = p.strip().lstrip("—-– \n")
                     if ":" in content[:10]: content = content.split(":", 1)[-1].strip()
-                    sec[n] = content
+                    sec[n_sec] = content
                     break
 
         st.markdown("---")
@@ -351,17 +363,17 @@ if uploaded_files:
         tabs = st.tabs([f"📝 {t['tab_main']}", f"📱 {t['tab_social']}", f"🎬 {t['tab_video']}", f"⚙️ {t['tab_tech']}", f"✉️ {t['tab_email']}", f"🔍 {t['tab_seo']}"])
         suffixes = ["listing", "social", "video", "tech", "email", "seo"]
         
-        for i, tab in enumerate(tabs):
+        for idx, tab in enumerate(tabs):
             with tab:
-                label_key = f"label_{suffixes[i]}"
-                edited = st.text_area(t[label_key], value=sec[str(i+1)], height=450, key=f"txt_{i}")
+                key_label = f"label_{suffixes[idx]}"
+                edited_txt = st.text_area(t[key_label], value=sec[str(idx+1)], height=450, key=f"txt_{idx}")
                 c1, c2 = st.columns(2)
                 with c1: 
-                    if st.button(f"💾 {t['save_btn']}", key=f"save_{i}"): st.success(t["saved_msg"])
-                with c2: st.download_button(f"📥 {t['download']}", data=edited, file_name=f"sarsa_{suffixes[i]}.txt", key=f"dl_{i}")
+                    if st.button(f"💾 {t['save_btn']}", key=f"save_{idx}"): st.success(t["saved_msg"])
+                with c2: st.download_button(f"📥 {t['download']}", data=edited_txt, file_name=f"sarsa_{suffixes[idx]}.txt", key=f"dl_{idx}")
 
 else:
-    # ── EMPTY STATE (ALL BLUE TAGS) ──
+    # ── EMPTY STATE (UNIFORM BLUE TAGS) ──
     st.html(f"""
     <div style="text-align:center;padding:4rem 2rem;color:#94a3b8; border:2px dashed #e2e8f0;border-radius:16px;background:#fafbfc;">
         <div style="font-size:3.5rem;margin-bottom:1rem;opacity:0.5;">🏘️</div>
