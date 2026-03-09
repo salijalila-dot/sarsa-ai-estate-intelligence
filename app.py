@@ -13,6 +13,13 @@ supabase: Client = create_client(url, key)
 # ─── SESSION STATE INITIALIZATION ──────────────────────────────────────────
 if 'auth_lang' not in st.session_state:
     st.session_state.auth_lang = "English"
+    
+# BU İKİ SATIRI EKLİYORUZ
+if 'is_logged_in' not in st.session_state:
+    st.session_state.is_logged_in = False
+if 'user_email' not in st.session_state:
+    st.session_state.user_email = None
+
 
 # ─── AUTH LANGUAGES (ALL 10 LANGUAGES ADDED) ───────────────────────────────
 auth_texts = {
