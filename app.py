@@ -18,56 +18,56 @@ if 'auth_lang' not in st.session_state:
 auth_texts = {
     "English": {
         "access": "SarSa AI Access", "login": "Login", "register": "Register", "email": "Email", "password": "Password", 
-        "btn_login": "Login", "btn_reg": "Create Account", "success_reg": "Registration successful! Check your email.", 
-        "error_login": "Login failed.", "verify_msg": "⚠️ Please verify your email:", "btn_check": "I verified, let me in", 
+        "btn_login": "Login", "btn_reg": "Create Account", "success_reg": "Registration successful! Check your email to verify your account.", 
+        "error_login": "Login failed. You are not registered, or your Email/Password is incorrect.", "verify_msg": "⚠️ Please verify your email:", "btn_check": "I verified, let me in", 
         "unpaid_msg": "Subscription required.", "upgrade_title": "🚀 Professional Plan", "pay_btn": "Subscribe Now"
     },
     "Türkçe": {
         "access": "SarSa AI Erişimi", "login": "Giriş Yap", "register": "Kayıt Ol", "email": "E-posta", "password": "Şifre", 
-        "btn_login": "Oturum Aç", "btn_reg": "Hesap Oluştur", "success_reg": "Kayıt başarılı! E-postanızı onaylayın.", 
-        "error_login": "Giriş başarısız.", "verify_msg": "⚠️ Lütfen e-postanızı onaylayın:", "btn_check": "Onayladım, içeri al", 
+        "btn_login": "Oturum Aç", "btn_reg": "Hesap Oluştur", "success_reg": "Kayıt başarılı! Hesabınızı onaylamak için e-postanızı kontrol edin.", 
+        "error_login": "Giriş başarısız. Kayıtlı değilsiniz veya E-posta/Şifreniz hatalı.", "verify_msg": "⚠️ Lütfen e-postanızı onaylayın:", "btn_check": "Onayladım, içeri al", 
         "unpaid_msg": "Abonelik gerekiyor.", "upgrade_title": "🚀 Profesyonel Paket", "pay_btn": "Şimdi Abone Ol"
     },
     "Español": {
         "access": "Acceso a SarSa AI", "login": "Iniciar Sesión", "register": "Registrarse", "email": "Correo", "password": "Clave", 
-        "btn_login": "Entrar", "btn_reg": "Crear Cuenta", "success_reg": "¡Registro exitoso! Revisa tu email.", 
-        "error_login": "Error al entrar.", "verify_msg": "⚠️ Verifica tu email:", "btn_check": "Ya verifiqué, entrar", 
+        "btn_login": "Entrar", "btn_reg": "Crear Cuenta", "success_reg": "¡Registro exitoso! Revisa tu email para verificar tu cuenta.", 
+        "error_login": "Error. No estás registrado o tu Correo/Clave es incorrecto.", "verify_msg": "⚠️ Verifica tu email:", "btn_check": "Ya verifiqué, entrar", 
         "unpaid_msg": "Suscripción necesaria.", "upgrade_title": "🚀 Plan Profesional", "pay_btn": "Suscribirse Ahora"
     },
     "Deutsch": {
         "access": "SarSa AI Zugang", "login": "Anmelden", "register": "Registrieren", "email": "E-Mail", "password": "Passwort", 
-        "btn_login": "Login", "btn_reg": "Konto Erstellen", "success_reg": "Erfolgreich! E-Mail bestätigen.", 
-        "error_login": "Login fehlgeschlagen.", "verify_msg": "⚠️ E-Mail bestätigen:", "btn_check": "Bestätigt, einloggen", 
+        "btn_login": "Login", "btn_reg": "Konto Erstellen", "success_reg": "Erfolgreich! Bitte bestätigen Sie Ihre E-Mail.", 
+        "error_login": "Login fehlgeschlagen. Nicht registriert oder E-Mail/Passwort falsch.", "verify_msg": "⚠️ E-Mail bestätigen:", "btn_check": "Bestätigt, einloggen", 
         "unpaid_msg": "Abo erforderlich.", "upgrade_title": "🚀 Profi-Paket", "pay_btn": "Jetzt Abonnieren"
     },
     "Français": {
         "access": "Accès SarSa AI", "login": "Connexion", "register": "S'inscrire", "email": "Email", "password": "Mot de passe", 
-        "btn_login": "Se connecter", "btn_reg": "Créer un compte", "success_reg": "Succès ! Vérifiez vos emails.", 
-        "error_login": "Échec de connexion.", "verify_msg": "⚠️ Vérifiez votre email :", "btn_check": "Vérifié, entrer", 
+        "btn_login": "Se connecter", "btn_reg": "Créer un compte", "success_reg": "Succès ! Vérifiez vos emails pour confirmer.", 
+        "error_login": "Échec. Vous n'êtes pas inscrit ou Email/Mot de passe incorrect.", "verify_msg": "⚠️ Vérifiez votre email :", "btn_check": "Vérifié, entrer", 
         "unpaid_msg": "Abonnement requis.", "upgrade_title": "🚀 Pack Professionnel", "pay_btn": "S'abonner Maintenant"
     },
     "Português": {
         "access": "Acesso SarSa AI", "login": "Entrar", "register": "Registar", "email": "Email", "password": "Senha", 
-        "btn_login": "Login", "btn_reg": "Criar Conta", "success_reg": "Sucesso! Verifique seu email.", 
-        "error_login": "Falha no login.", "verify_msg": "⚠️ Verifique seu email:", "btn_check": "Verificado, entrar", 
+        "btn_login": "Login", "btn_reg": "Criar Conta", "success_reg": "Sucesso! Verifique seu email para confirmar a conta.", 
+        "error_login": "Falha. Não registado ou Email/Senha incorretos.", "verify_msg": "⚠️ Verifique seu email:", "btn_check": "Verificado, entrar", 
         "unpaid_msg": "Assinatura necessária.", "upgrade_title": "🚀 Plano Profissional", "pay_btn": "Assinar Agora"
     },
     "日本語": {
         "access": "SarSa AI アクセス", "login": "ログイン", "register": "新規登録", "email": "メール", "password": "パスワード", 
-        "btn_login": "ログイン", "btn_reg": "アカウント作成", "success_reg": "登録完了！メールを確認してください。", 
-        "error_login": "ログインに失敗しました。", "verify_msg": "⚠️ メールを認証してください:", "btn_check": "認証済み、入る", 
+        "btn_login": "ログイン", "btn_reg": "アカウント作成", "success_reg": "登録完了！メールを確認してアカウントを認証してください。", 
+        "error_login": "ログイン失敗。未登録か、メール/パスワードが間違っています。", "verify_msg": "⚠️ メールを認証してください:", "btn_check": "認証済み、入る", 
         "unpaid_msg": "サブスクリプションが必要です。", "upgrade_title": "🚀 プロフェッショナルプラン", "pay_btn": "今すぐ購読"
     },
     "简体中文": {
         "access": "SarSa AI 访问", "login": "登录", "register": "注册", "email": "邮箱", "password": "密码", 
-        "btn_login": "登录", "btn_reg": "创建账号", "success_reg": "注册成功！请检查邮箱。", 
-        "error_login": "登录失败。", "verify_msg": "⚠️ 请验证您的邮箱:", "btn_check": "已验证，进入", 
+        "btn_login": "登录", "btn_reg": "创建账号", "success_reg": "注册成功！请检查邮箱以验证账号。", 
+        "error_login": "登录失败。您未注册，或邮箱/密码错误。", "verify_msg": "⚠️ 请验证您的邮箱:", "btn_check": "已验证，进入", 
         "unpaid_msg": "需要订阅。", "upgrade_title": "🚀 专业版方案", "pay_btn": "立即订阅"
     },
     "العربية": {
         "access": "دخول SarSa AI", "login": "تسجيل الدخول", "register": "إنشاء حساب", "email": "البريد", "password": "كلمة السر", 
-        "btn_login": "دخول", "btn_reg": "إنشاء حساب", "success_reg": "تم التسجيل بنجاح! تحقق من بريدك.", 
-        "error_login": "فشل الدخول.", "verify_msg": "⚠️ يرجى تأكيد بريدك:", "btn_check": "تم التأكيد، دخول", 
+        "btn_login": "دخول", "btn_reg": "إنشاء حساب", "success_reg": "تم التسجيل بنجاح! تحقق من بريدك لتأكيد الحساب.", 
+        "error_login": "فشل الدخول. أنت غير مسجل، أو البريد/كلمة السر خاطئة.", "verify_msg": "⚠️ يرجى تأكيد بريدك:", "btn_check": "تم التأكيد، دخول", 
         "unpaid_msg": "يتطلب اشتراكاً نشطاً.", "upgrade_title": "🚀 الباقة الاحترافية", "pay_btn": "اشترك الآن"
     }
 }
@@ -86,52 +86,10 @@ def get_status():
         if not user.email_confirmed_at:
             return "unverified", user.email
 
-        # 3. Adım: Ödeme yapılmış mı?
-        try:
-            res = supabase.table("profiles").select("is_paid").eq("id", user.id).execute()
-            if res.data and res.data[0].get("is_paid") == True:
-                return "paid", user.email
-        except:
-            pass # Tablo hatası olsa bile giriş başarılı sayılsın (unpaid olarak)
-            
-        return "unpaid", user.email
+        # 3. Adım: ŞİMDİLİK ödeme adımını atlıyoruz. Mail onaylıysa direkt "paid" (içeri al) diyoruz.
+        return "paid", user.email
     except Exception as e:
         return "logged_out", None
-
-def show_login_page():
-    at = auth_texts.get(st.session_state.auth_lang, auth_texts["English"])
-    st.markdown(f"<h2 style='text-align:center;'>{at['access']}</h2>", unsafe_allow_html=True)
-    
-    tab1, tab2 = st.tabs([at['login'], at['register']])
-    
-    with tab1:
-        with st.form("l_form"):
-            e = st.text_input(at['email'])
-            p = st.text_input(at['password'], type="password")
-            submit_l = st.form_submit_button(at['btn_login'], use_container_width=True)
-            
-            if submit_l:
-                try:
-                    # Supabase'e giriş isteği gönder
-                    res = supabase.auth.sign_in_with_password({"email": e, "password": p})
-                    if res.user:
-                        st.success("Success!")
-                        st.rerun() # Giriş başarılıysa sayfayı yenile ve uygulamayı aç
-                except Exception as ex:
-                    # Hatayı detaylı göster ki neden giremediğimizi anlayalım
-                    error_msg = str(ex)
-                    if "Email not confirmed" in error_msg:
-                        st.error(f"{at['verify_msg']} {e}")
-                    elif "Invalid login credentials" in error_msg:
-                        st.error(f"{at['error_login']} (Email/Şifre Hatalı)")
-                    else:
-                        st.error(f"Sistem Hatası: {error_msg}")
-
-    with tab2:
-        # Kayıt olma kısmı (Buraya da benzer bir st.form koyabilirsin)
-        pass 
-
-
 
 # ─── UI FLOW ───────────────────────────────────────────────────────────────
 auth_status, user_email = get_status()
@@ -170,7 +128,7 @@ if auth_status == "logged_out":
                     if "Email not confirmed" in error_msg:
                         st.error(f"{at['verify_msg']} {e}")
                     elif "Invalid login credentials" in error_msg:
-                        st.error(f"{at['error_login']} (E-posta veya şifre hatalı)")
+                        st.error(f"❌ {at['error_login']}")
                     else:
                         st.error(f"Sistem Hatası: {error_msg}")
 
@@ -180,23 +138,21 @@ if auth_status == "logged_out":
             np = st.text_input(at['password'] + " (Min 6)", type="password")
             if st.form_submit_button(at['btn_reg'], use_container_width=True):
                 try:
-                    supabase.auth.sign_up({"email": ne, "password": np})
-                    st.success(at['success_reg'])
+                    res = supabase.auth.sign_up({"email": ne, "password": np})
+                    if res.user:
+                        st.success(f"✅ {at['success_reg']}")
                 except Exception as ex: 
-                    st.error(f"Sistem Hatası: {ex}")
+                    error_msg = str(ex)
+                    if "User already registered" in error_msg:
+                        st.error("Bu e-posta adresi zaten kayıtlı. Lütfen giriş yapın.")
+                    else:
+                        st.error(f"Kayıt Hatası: {ex}")
     st.stop()
 
 
 elif auth_status == "unverified":
     st.warning(f"{at['verify_msg']} {user_email}")
     if st.button(at['btn_check'], use_container_width=True): st.rerun()
-    st.stop()
-
-elif auth_status == "unpaid":
-    st.info(f"{at['unpaid_msg']} ({user_email})")
-    st.markdown(f"### {at['upgrade_title']}")
-    st.link_button(at['pay_btn'], "https://buy.stripe.com/senin_linkin", use_container_width=True)
-    if st.button("🔄 I've paid / Ödeme Yaptım", use_container_width=True): st.rerun()
     st.stop()
 
 
@@ -802,6 +758,11 @@ with st.sidebar:
         st.image(logo_img, use_container_width=True)
     else:
         st.markdown("<div style='text-align:center; padding:0.8rem 0 0.5rem;'><span style='font-size:1.8rem; font-weight:800; color:#0f172a;'>SarSa</span><span style='font-size:1.8rem; font-weight:800; background:linear-gradient(135deg,#3b82f6,#8b5cf6); -webkit-background-clip:text;-webkit-text-fill-color:transparent;'> AI</span></div>", unsafe_allow_html=True)
+
+    # TEST VE KULLANIM KOLAYLIĞI İÇİN ÇIKIŞ YAP BUTONU
+    if st.button("🚪 Çıkış Yap / Logout", use_container_width=True):
+        supabase.auth.sign_out()
+        st.rerun()
 
     current_ui_lang = st.selectbox("🌐 Interface Language", list(ui_languages.keys()), index=0)
     t = ui_languages[current_ui_lang]
