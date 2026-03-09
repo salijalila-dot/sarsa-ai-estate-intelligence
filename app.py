@@ -76,12 +76,26 @@ auth_texts = {
 def get_status():
     try:
         user_resp = supabase.auth.get_user()
-        if not user_resp or not user_resp.user: return "logged_out", None
+        if not user_resp or not user_resp.user:
+            return "logged_out", None
+        
         user = user_resp.user
-        if not user.email_confirmed_at: return "unverified", user.email
-        res = supabase.table("profiles").select("is_paid").eq("id", user.id).single().execute()
-        return ("paid" if res.data and res.data.get("is_paid") else "unpaid"), user.email
-    except: return "logged_out", None
+        if not user.email_confirmed_at:
+            return "unverified", user.email
+
+        # Profil tablosuna bak
+        res = supabase.table("profiles").select("is_paid").eq("id", user.id).execute()
+        
+        # EĞER TABLODA YOKSA (Otomasyon henüz bitmemişse)
+        if not res.data:
+            # Kullanıcıyı 'ödememiş' olarak varsayıp login yaptır (Hata verme!)
+            return "unpaid", user.email
+            
+        return ("paid" if res.data[0].get("is_paid") else "unpaid"), user.email
+    except Exception as e:
+        print(f"Auth Error: {e}")
+        return "logged_out", None
+
 
 # ─── UI FLOW ───────────────────────────────────────────────────────────────
 auth_status, user_email = get_status()
