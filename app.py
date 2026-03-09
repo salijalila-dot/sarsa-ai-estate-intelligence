@@ -81,19 +81,23 @@ auth_texts = {
 
 # ─── AUTH FUNCTIONS ────────────────────────────────────────────────────────
 def get_status():
+    # 1. Adım: Önce kendi hafızamıza bakalım, bu kişi zaten içeride mi?
+    if st.session_state.get('is_logged_in'):
+        return "paid", st.session_state.user_email
+
     try:
-        # 1. Adım: Oturum var mı?
         user_resp = supabase.auth.get_user()
         if not user_resp or not user_resp.user:
             return "logged_out", None
         
         user = user_resp.user
         
-        # 2. Adım: Mail onaylı mı?
         if not user.email_confirmed_at:
             return "unverified", user.email
 
-        # 3. Adım: ŞİMDİLİK ödeme adımını atlıyoruz. Mail onaylıysa direkt "paid" (içeri al) diyoruz.
+        # Oturum Supabase'de varsa ama hafızada yoksa hafızaya yaz
+        st.session_state.is_logged_in = True
+        st.session_state.user_email = user.email
         return "paid", user.email
     except Exception as e:
         return "logged_out", None
