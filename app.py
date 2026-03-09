@@ -120,7 +120,8 @@ if auth_status == "logged_out":
     st.markdown(f"<h2 style='text-align:center;'>{at['access']}</h2>", unsafe_allow_html=True)
     tab1, tab2 = st.tabs([at['login'], at['register']])
     
-        with tab1:
+            with tab1:
+        # Bak, bu satır 'with tab1'in bir tık sağında olmalı
         with st.form("l_form"):
             e = st.text_input(at['email'])
             p = st.text_input(at['password'], type="password")
@@ -131,15 +132,12 @@ if auth_status == "logged_out":
                     # Detaylı giriş denemesi
                     res = supabase.auth.sign_in_with_password({"email": e, "password": p})
                     if res.user:
-                        # GİRİŞ BAŞARILIYSA HAFIZAYA YAZIYORUZ (YENİ EKLENEN KISIM BURASI)
+                        # GİRİŞ BAŞARILIYSA HAFIZAYA YAZIYORUZ
                         st.session_state.is_logged_in = True
                         st.session_state.user_email = e
-                        
                         st.success("Giriş başarılı!")
                         st.rerun()
                 except Exception as ex:
-                    # Gerçek hatayı ekrana basıyoruz
- ekrana basıyoruz
                     error_msg = str(ex)
                     if "Email not confirmed" in error_msg:
                         st.error(f"{at['verify_msg']} {e}")
@@ -163,13 +161,7 @@ if auth_status == "logged_out":
                         st.error("Bu e-posta adresi zaten kayıtlı. Lütfen giriş yapın.")
                     else:
                         st.error(f"Kayıt Hatası: {ex}")
-    st.stop()
 
-
-elif auth_status == "unverified":
-    st.warning(f"{at['verify_msg']} {user_email}")
-    if st.button(at['btn_check'], use_container_width=True): st.rerun()
-    st.stop()
 
 
 # ─── AI CONFIGURATION ───────────────────────────────────────────────────────
