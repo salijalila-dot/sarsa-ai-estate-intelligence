@@ -120,8 +120,7 @@ if auth_status == "logged_out":
     st.markdown(f"<h2 style='text-align:center;'>{at['access']}</h2>", unsafe_allow_html=True)
     tab1, tab2 = st.tabs([at['login'], at['register']])
     
-            with tab1:
-        # Bak, bu satır 'with tab1'in bir tık sağında olmalı
+    with tab1:
         with st.form("l_form"):
             e = st.text_input(at['email'])
             p = st.text_input(at['password'], type="password")
@@ -129,10 +128,8 @@ if auth_status == "logged_out":
             
             if submit_l:
                 try:
-                    # Detaylı giriş denemesi
                     res = supabase.auth.sign_in_with_password({"email": e, "password": p})
                     if res.user:
-                        # GİRİŞ BAŞARILIYSA HAFIZAYA YAZIYORUZ
                         st.session_state.is_logged_in = True
                         st.session_state.user_email = e
                         st.success("Giriş başarılı!")
@@ -161,6 +158,7 @@ if auth_status == "logged_out":
                         st.error("Bu e-posta adresi zaten kayıtlı. Lütfen giriş yapın.")
                     else:
                         st.error(f"Kayıt Hatası: {ex}")
+
 
 
 
