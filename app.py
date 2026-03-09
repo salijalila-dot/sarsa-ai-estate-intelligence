@@ -75,28 +75,62 @@ auth_texts = {
 # ─── AUTH FUNCTIONS ────────────────────────────────────────────────────────
 def get_status():
     try:
+        # 1. Adım: Oturum var mı?
         user_resp = supabase.auth.get_user()
-        # Eğer kullanıcı oturum açmamışsa (Auth katmanı)
         if not user_resp or not user_resp.user:
             return "logged_out", None
         
         user = user_resp.user
-        # Eğer mail onaylanmamışsa
+        
+        # 2. Adım: Mail onaylı mı?
         if not user.email_confirmed_at:
             return "unverified", user.email
 
-        # Ödeme kontrolü (Database katmanı)
+        # 3. Adım: Ödeme yapılmış mı?
         try:
             res = supabase.table("profiles").select("is_paid").eq("id", user.id).execute()
-            # Kullanıcı tabloda varsa ve is_paid True ise 'paid'
             if res.data and res.data[0].get("is_paid") == True:
                 return "paid", user.email
         except:
-            pass # Tablo hatası olsa bile 'unpaid' olarak devam etsin
+            pass # Tablo hatası olsa bile giriş başarılı sayılsın (unpaid olarak)
             
-        return "unpaid", user.email # Varsayılan durum: Giriş başarılı ama ödeme yok
+        return "unpaid", user.email
     except Exception as e:
         return "logged_out", None
+
+def show_login_page():
+    at = auth_texts.get(st.session_state.auth_lang, auth_texts["English"])
+    st.markdown(f"<h2 style='text-align:center;'>{at['access']}</h2>", unsafe_allow_html=True)
+    
+    tab1, tab2 = st.tabs([at['login'], at['register']])
+    
+    with tab1:
+        with st.form("l_form"):
+            e = st.text_input(at['email'])
+            p = st.text_input(at['password'], type="password")
+            submit_l = st.form_submit_button(at['btn_login'], use_container_width=True)
+            
+            if submit_l:
+                try:
+                    # Supabase'e giriş isteği gönder
+                    res = supabase.auth.sign_in_with_password({"email": e, "password": p})
+                    if res.user:
+                        st.success("Success!")
+                        st.rerun() # Giriş başarılıysa sayfayı yenile ve uygulamayı aç
+                except Exception as ex:
+                    # Hatayı detaylı göster ki neden giremediğimizi anlayalım
+                    error_msg = str(ex)
+                    if "Email not confirmed" in error_msg:
+                        st.error(f"{at['verify_msg']} {e}")
+                    elif "Invalid login credentials" in error_msg:
+                        st.error(f"{at['error_login']} (Email/Şifre Hatalı)")
+                    else:
+                        st.error(f"Sistem Hatası: {error_msg}")
+
+    with tab2:
+        # Kayıt olma kısmı (Buraya da benzer bir st.form koyabilirsin)
+        pass 
+
 
 
 # ─── UI FLOW ───────────────────────────────────────────────────────────────
