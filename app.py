@@ -775,10 +775,14 @@ with st.sidebar:
     else:
         st.markdown("<div style='text-align:center; padding:0.8rem 0 0.5rem;'><span style='font-size:1.8rem; font-weight:800; color:#0f172a;'>SarSa</span><span style='font-size:1.8rem; font-weight:800; background:linear-gradient(135deg,#3b82f6,#8b5cf6); -webkit-background-clip:text;-webkit-text-fill-color:transparent;'> AI</span></div>", unsafe_allow_html=True)
 
-    # TEST VE KULLANIM KOLAYLIĞI İÇİN ÇIKIŞ YAP BUTONU
+        # TEST VE KULLANIM KOLAYLIĞI İÇİN ÇIKIŞ YAP BUTONU
     if st.button("🚪 Çıkış Yap / Logout", use_container_width=True):
         supabase.auth.sign_out()
+        # Çıkış yaparken hafızayı siliyoruz (BUNLAR YENİ EKLENDİ)
+        st.session_state.is_logged_in = False
+        st.session_state.user_email = None
         st.rerun()
+
 
     current_ui_lang = st.selectbox("🌐 Interface Language", list(ui_languages.keys()), index=0)
     t = ui_languages[current_ui_lang]
