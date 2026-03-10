@@ -120,6 +120,22 @@ def get_status():
 # ─── UI FLOW ───────────────────────────────────────────────────────────────
 auth_status, user_email = get_status()
 
+# --- ŞİFRE SIFIRLAMA YAKALAYICI ---
+query_params = st.query_params
+if "type" in query_params and query_params["type"] == "recovery":
+    st.warning("🔒 Reset Your Password")
+    with st.form("recovery_form"):
+        new_password_recovery = st.text_input("New Password", type="password")
+        if st.form_submit_button("Set New Password"):
+            try:
+                supabase.auth.update_user({"password": new_password_recovery})
+                st.success("Password updated! You can now login.")
+                st.query_params.clear() # Linkteki kodları temizle
+                st.info("Please login with your new password.")
+            except Exception as e:
+                st.error(f"Error: {e}")
+    st.stop() # Diğer giriş ekranlarını gösterme, sadece buna odaklan
+
 def update_lang():
     st.session_state.auth_lang = st.session_state.lang_selector
 
