@@ -945,17 +945,22 @@ with st.sidebar:
         st.subheader(t.get('update_pw', 'Update Password'))
         new_pw = st.text_input(t.get('new_pw', 'New Password'), type="password", key="settings_new_pw")
         
-        if st.button(t.get('btn_update', 'Update Now'), key="settings_update_btn"):
+                if st.button(t.get('btn_update', 'Update Now'), key="settings_update_btn"):
             if len(new_pw) < 6:
                 st.warning(t.get('pw_min_err', 'Min 6 chars'))
             else:
                 try:
-                    # Oturumu tazele ve şifreyi gönder
-                    supabase.auth.get_session()
-                    supabase.auth.update_user({"password": new_pw})
-                    st.success(t.get('saved_msg', 'Saved!'))
+                    # KRİTİK DÜZELTME: Önce aktif oturumu "çek" ve doğrula
+                    sess = supabase.auth.get_session()
+                    if sess:
+                        supabase.auth.update_user({"password": new_pw})
+                        st.success(t.get('saved_msg', 'Saved!'))
+                    else:
+                        st.error("Oturum zaman aşımına uğradı, lütfen tekrar giriş yapın.")
                 except Exception as e:
-                    st.error(f"{e}")
+                    # Hata mesajı eğer "Auth session missing" ise kullanıcıya anlamlı bilgi ver
+                    st.error(f"Sistem Hatası: {e}")
+
 
         st.markdown("---")
         st.subheader(t.get('danger_zone', 'Danger Zone'))
