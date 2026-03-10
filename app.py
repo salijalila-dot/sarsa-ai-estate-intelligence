@@ -21,61 +21,70 @@ if 'user_email' not in st.session_state:
     st.session_state.user_email = None
 
 
-# ─── AUTH LANGUAGES (ALL 10 LANGUAGES ADDED) ───────────────────────────────
+# ─── AUTH LANGUAGES (ALL 10 LANGUAGES ADDED & UPDATED) ───────────────────────────────
 auth_texts = {
     "English": {
         "access": "SarSa AI Access", "login": "Login", "register": "Register", "email": "Email", "password": "Password", 
         "btn_login": "Login", "btn_reg": "Create Account", "success_reg": "Registration successful! Check your email to verify your account.", 
         "error_login": "Login failed. You are not registered, or your Email/Password is incorrect.", "verify_msg": "⚠️ Please verify your email:", "btn_check": "I verified, let me in", 
-        "unpaid_msg": "Subscription required.", "upgrade_title": "🚀 Professional Plan", "pay_btn": "Subscribe Now"
+        "unpaid_msg": "Subscription required.", "upgrade_title": "🚀 Professional Plan", "pay_btn": "Subscribe Now",
+        "welcome_title": "Welcome to SarSa AI", "welcome_desc": "The All-in-One Visual Property Intelligence & Global Sales Automation platform. Transform your property photos into professional assets in seconds.", "login_prompt": "Log in to use the application"
     },
     "Türkçe": {
         "access": "SarSa AI Erişimi", "login": "Giriş Yap", "register": "Kayıt Ol", "email": "E-posta", "password": "Şifre", 
         "btn_login": "Oturum Aç", "btn_reg": "Hesap Oluştur", "success_reg": "Kayıt başarılı! Hesabınızı onaylamak için e-postanızı kontrol edin.", 
         "error_login": "Giriş başarısız. Kayıtlı değilsiniz veya E-posta/Şifreniz hatalı.", "verify_msg": "⚠️ Lütfen e-postanızı onaylayın:", "btn_check": "Onayladım, içeri al", 
-        "unpaid_msg": "Abonelik gerekiyor.", "upgrade_title": "🚀 Profesyonel Paket", "pay_btn": "Şimdi Abone Ol"
+        "unpaid_msg": "Abonelik gerekiyor.", "upgrade_title": "🚀 Profesyonel Paket", "pay_btn": "Şimdi Abone Ol",
+        "welcome_title": "SarSa AI'a Hoş Geldiniz", "welcome_desc": "Hepsi Bir Arada Görsel Mülk Zekâsı ve Küresel Satış Otomasyonu platformu. Mülk fotoğraflarınızı saniyeler içinde profesyonel varlıklara dönüştürün.", "login_prompt": "Uygulamayı kullanmak için giriş yapın"
     },
     "Español": {
         "access": "Acceso a SarSa AI", "login": "Iniciar Sesión", "register": "Registrarse", "email": "Correo", "password": "Clave", 
         "btn_login": "Entrar", "btn_reg": "Crear Cuenta", "success_reg": "¡Registro exitoso! Revisa tu email para verificar tu cuenta.", 
         "error_login": "Error. No estás registrado o tu Correo/Clave es incorrecto.", "verify_msg": "⚠️ Verifica tu email:", "btn_check": "Ya verifiqué, entrar", 
-        "unpaid_msg": "Suscripción necesaria.", "upgrade_title": "🚀 Plan Profesional", "pay_btn": "Suscribirse Ahora"
+        "unpaid_msg": "Suscripción necesaria.", "upgrade_title": "🚀 Plan Profesional", "pay_btn": "Suscribirse Ahora",
+        "welcome_title": "Bienvenido a SarSa AI", "welcome_desc": "La plataforma todo en uno de Inteligencia Visual de Propiedades y Automatización de Ventas. Transforme sus fotos en activos profesionales en segundos.", "login_prompt": "Inicie sesión para usar la aplicación"
     },
     "Deutsch": {
         "access": "SarSa AI Zugang", "login": "Anmelden", "register": "Registrieren", "email": "E-Mail", "password": "Passwort", 
         "btn_login": "Login", "btn_reg": "Konto Erstellen", "success_reg": "Erfolgreich! Bitte bestätigen Sie Ihre E-Mail.", 
         "error_login": "Login fehlgeschlagen. Nicht registriert oder E-Mail/Passwort falsch.", "verify_msg": "⚠️ E-Mail bestätigen:", "btn_check": "Bestätigt, einloggen", 
-        "unpaid_msg": "Abo erforderlich.", "upgrade_title": "🚀 Profi-Paket", "pay_btn": "Jetzt Abonnieren"
+        "unpaid_msg": "Abo erforderlich.", "upgrade_title": "🚀 Profi-Paket", "pay_btn": "Jetzt Abonnieren",
+        "welcome_title": "Willkommen bei SarSa AI", "welcome_desc": "Die All-in-One-Plattform für visuelle Immobilienintelligenz. Verwandeln Sie Ihre Immobilienfotos in Sekundenschnelle in professionelle Assets.", "login_prompt": "Melden Sie sich an, um die App zu nutzen"
     },
     "Français": {
         "access": "Accès SarSa AI", "login": "Connexion", "register": "S'inscrire", "email": "Email", "password": "Mot de passe", 
         "btn_login": "Se connecter", "btn_reg": "Créer un compte", "success_reg": "Succès ! Vérifiez vos emails pour confirmer.", 
         "error_login": "Échec. Vous n'êtes pas inscrit ou Email/Mot de passe incorrect.", "verify_msg": "⚠️ Vérifiez votre email :", "btn_check": "Vérifié, entrer", 
-        "unpaid_msg": "Abonnement requis.", "upgrade_title": "🚀 Pack Professionnel", "pay_btn": "S'abonner Maintenant"
+        "unpaid_msg": "Abonnement requis.", "upgrade_title": "🚀 Pack Professionnel", "pay_btn": "S'abonner Maintenant",
+        "welcome_title": "Bienvenue sur SarSa AI", "welcome_desc": "La plateforme d'Intelligence Visuelle Immobilière et d'Automatisation des Ventes. Transformez vos photos en atouts professionnels en quelques secondes.", "login_prompt": "Connectez-vous pour utiliser l'application"
     },
     "Português": {
         "access": "Acesso SarSa AI", "login": "Entrar", "register": "Registar", "email": "Email", "password": "Senha", 
         "btn_login": "Login", "btn_reg": "Criar Conta", "success_reg": "Sucesso! Verifique seu email para confirmar a conta.", 
         "error_login": "Falha. Não registado ou Email/Senha incorretos.", "verify_msg": "⚠️ Verifique seu email:", "btn_check": "Verificado, entrar", 
-        "unpaid_msg": "Assinatura necessária.", "upgrade_title": "🚀 Plano Profissional", "pay_btn": "Assinar Agora"
+        "unpaid_msg": "Assinatura necessária.", "upgrade_title": "🚀 Plano Profissional", "pay_btn": "Assinar Agora",
+        "welcome_title": "Bem-vindo ao SarSa AI", "welcome_desc": "A plataforma tudo-em-um de Inteligência Imobiliária Visual e Automação de Vendas. Transforme as suas fotos em ativos profissionais em segundos.", "login_prompt": "Faça login para usar o aplicativo"
     },
     "日本語": {
         "access": "SarSa AI アクセス", "login": "ログイン", "register": "新規登録", "email": "メール", "password": "パスワード", 
         "btn_login": "ログイン", "btn_reg": "アカウント作成", "success_reg": "登録完了！メールを確認してアカウントを認証してください。", 
         "error_login": "ログイン失敗。未登録か、メール/パスワードが間違っています。", "verify_msg": "⚠️ メールを認証してください:", "btn_check": "認証済み、入る", 
-        "unpaid_msg": "サブスクリプションが必要です。", "upgrade_title": "🚀 プロフェッショナルプラン", "pay_btn": "今すぐ購読"
+        "unpaid_msg": "サブスクリプションが必要です。", "upgrade_title": "🚀 プロフェッショナルプラン", "pay_btn": "今すぐ購読",
+        "welcome_title": "SarSa AI へようこそ", "welcome_desc": "オールインワンの視覚的物件インテリジェンス＆販売自動化プラットフォーム。物件の写真を数秒でプロフェッショナルな資産に変換します。", "login_prompt": "アプリを使用するにはログインしてください"
     },
     "简体中文": {
         "access": "SarSa AI 访问", "login": "登录", "register": "注册", "email": "邮箱", "password": "密码", 
         "btn_login": "登录", "btn_reg": "创建账号", "success_reg": "注册成功！请检查邮箱以验证账号。", 
         "error_login": "登录失败。您未注册，或邮箱/密码错误。", "verify_msg": "⚠️ 请验证您的邮箱:", "btn_check": "已验证，进入", 
-        "unpaid_msg": "需要订阅。", "upgrade_title": "🚀 专业版方案", "pay_btn": "立即订阅"
+        "unpaid_msg": "需要订阅。", "upgrade_title": "🚀 专业版方案", "pay_btn": "立即订阅",
+        "welcome_title": "欢迎来到 SarSa AI", "welcome_desc": "全方位房产视觉智能与全球销售自动化平台。在几秒钟内将您的房产照片转化为专业的营销资产。", "login_prompt": "登录以使用该应用程序"
     },
     "العربية": {
         "access": "دخول SarSa AI", "login": "تسجيل الدخول", "register": "إنشاء حساب", "email": "البريد", "password": "كلمة السر", 
         "btn_login": "دخول", "btn_reg": "إنشاء حساب", "success_reg": "تم التسجيل بنجاح! تحقق من بريدك لتأكيد الحساب.", 
         "error_login": "فشل الدخول. أنت غير مسجل، أو البريد/كلمة السر خاطئة.", "verify_msg": "⚠️ يرجى تأكيد بريدك:", "btn_check": "تم التأكيد، دخول", 
-        "unpaid_msg": "يتطلب اشتراكاً نشطاً.", "upgrade_title": "🚀 الباقة الاحترافية", "pay_btn": "اشترك الآن"
+        "unpaid_msg": "يتطلب اشتراكاً نشطاً.", "upgrade_title": "🚀 الباقة الاحترافية", "pay_btn": "اشترك الآن",
+        "welcome_title": "مرحباً بك في SarSa AI", "welcome_desc": "منصة الذكاء البصري المتكامل للعقارات وأتمتة المبيعات العالمية. حول صور عقاراتك إلى أصول احترافية في ثوانٍ.", "login_prompt": "قم بتسجيل الدخول لاستخدام التطبيق"
     }
 }
 
