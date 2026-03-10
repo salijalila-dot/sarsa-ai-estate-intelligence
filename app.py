@@ -945,7 +945,7 @@ with st.sidebar:
         st.subheader(t.get('update_pw', 'Update Password'))
         new_pw = st.text_input(t.get('new_pw', 'New Password'), type="password", key="settings_new_pw")
         
-                if st.button(t.get('btn_update', 'Update Now'), key="settings_update_btn"):
+   if st.button(t.get('btn_update', 'Update Now'), key="settings_update_btn"):
             if len(new_pw) < 6:
                 st.warning(t.get('pw_min_err', 'Min 6 chars'))
             else:
