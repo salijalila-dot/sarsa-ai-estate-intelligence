@@ -929,12 +929,18 @@ with st.sidebar:
         if st.button(f"❌ {t.get('btn_delete', 'Delete')}", type="primary", use_container_width=True):
             if confirm_delete:
                 try:
-                    user_id = supabase.auth.get_user().user.id
-                    # Not: Bu RPC fonksiyonunun veritabanında tanımlı olması gerekir
-                    supabase.rpc('soft_delete_profile', {'p_id': user_id, 'p_actor': user_id}).execute()
-                    supabase.auth.sign_out()
-                    st.session_state.is_logged_in = False
-                    st.rerun()
+                    # ÇÖZÜM: Önce kullanıcı var mı diye güvenli kontrol yapıyoruz
+                    user_data = supabase.auth.get_user()
+                    if user_data and user_data.user:
+                        user_id = user_data.user.id
+                        supabase.rpc('soft_delete_profile', {'p_id': user_id, 'p_actor': user_id}).execute()
+                        supabase.auth.sign_out()
+                        st.session_state.is_logged_in = False
+                        st.session_state.user_email = None
+                        st.success("Account deleted.")
+                        st.rerun()
+                    else:
+                        st.error("Session expired. Please login again to delete account.")
                 except Exception as e:
                     st.error(f"{e}")
 
