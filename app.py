@@ -126,8 +126,28 @@ if auth_status != "paid":
 at = auth_texts.get(st.session_state.auth_lang, auth_texts["English"])
 
 if auth_status == "logged_out":
-    st.markdown(f"<h2 style='text-align:center;'>{at['access']}</h2>", unsafe_allow_html=True)
-    tab1, tab2 = st.tabs([at['login'], at['register']])
+    # Profesyonel Giriş Ekranı Tasarımı
+    col_logo, col_text = st.columns([1, 6])
+    
+    with col_logo:
+        # load_logo fonksiyonu henüz tanımlanmadığı için doğrudan kontrol ediyoruz
+        if os.path.exists("SarSa_Logo_Transparent.png"):
+            st.image(Image.open("SarSa_Logo_Transparent.png"), use_container_width=True)
+            
+    with col_text:
+        st.markdown(f"<h1 style='text-align:left; color:#0f172a; font-weight:800; margin-top:0; padding-top:0;'>{at['welcome_title']}</h1>", unsafe_allow_html=True)
+        
+    st.markdown(f"<p style='font-size:1.15rem; color:#475569; font-weight:500; margin-bottom:2rem;'>{at['welcome_desc']}</p>", unsafe_allow_html=True)
+    
+    st.markdown("<hr style='border: 1px solid #e2e8f0; margin-bottom: 2rem;'>", unsafe_allow_html=True)
+    
+    st.markdown(f"<h3 style='text-align:center; color:#0f172a; margin-bottom:1.5rem;'>{at['login_prompt']}</h3>", unsafe_allow_html=True)
+
+    # Sekmelerin geniş görünmesi için CSS ekliyoruz
+    st.markdown("""<style>.stTabs [data-baseweb="tab-list"] {justify-content: center;}</style>""", unsafe_allow_html=True)
+    
+    tab1, tab2 = st.tabs([f"🔑 {at['login']}", f"📝 {at['register']}"])
+
     
     with tab1:
         with st.form("l_form"):
