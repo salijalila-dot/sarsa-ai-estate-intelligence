@@ -14,12 +14,10 @@ supabase: Client = create_client(url, key)
 if 'auth_lang' not in st.session_state:
     st.session_state.auth_lang = "English"
     
-# BU İKİ SATIRI EKLİYORUZ
 if 'is_logged_in' not in st.session_state:
     st.session_state.is_logged_in = False
 if 'user_email' not in st.session_state:
     st.session_state.user_email = None
-
 
 # ─── AUTH LANGUAGES (ALL 10 LANGUAGES ADDED & UPDATED) ───────────────────────────────
 auth_texts = {
@@ -90,7 +88,6 @@ auth_texts = {
 
 # ─── AUTH FUNCTIONS ────────────────────────────────────────────────────────
 def get_status():
-    # 1. Adım: Önce kendi hafızamıza bakalım, bu kişi zaten içeride mi?
     if st.session_state.get('is_logged_in'):
         return "paid", st.session_state.user_email
 
@@ -104,7 +101,6 @@ def get_status():
         if not user.email_confirmed_at:
             return "unverified", user.email
 
-        # Oturum Supabase'de varsa ama hafızada yoksa hafızaya yaz
         st.session_state.is_logged_in = True
         st.session_state.user_email = user.email
         return "paid", user.email
@@ -114,7 +110,6 @@ def get_status():
 # ─── UI FLOW ───────────────────────────────────────────────────────────────
 auth_status, user_email = get_status()
 
-# Language selection logic
 def update_lang():
     st.session_state.auth_lang = st.session_state.lang_selector
 
@@ -126,11 +121,9 @@ if auth_status != "paid":
 at = auth_texts.get(st.session_state.auth_lang, auth_texts["English"])
 
 if auth_status == "logged_out":
-    # Profesyonel Giriş Ekranı Tasarımı
     col_logo, col_text = st.columns([1, 6])
     
     with col_logo:
-        # load_logo fonksiyonu henüz tanımlanmadığı için doğrudan kontrol ediyoruz
         if os.path.exists("SarSa_Logo_Transparent.png"):
             st.image(Image.open("SarSa_Logo_Transparent.png"), use_container_width=True)
             
@@ -143,12 +136,10 @@ if auth_status == "logged_out":
     
     st.markdown(f"<h3 style='text-align:center; color:#0f172a; margin-bottom:1.5rem;'>{at['login_prompt']}</h3>", unsafe_allow_html=True)
 
-    # Sekmelerin geniş görünmesi için CSS ekliyoruz
     st.markdown("""<style>.stTabs [data-baseweb="tab-list"] {justify-content: center;}</style>""", unsafe_allow_html=True)
     
     tab1, tab2 = st.tabs([f"🔑 {at['login']}", f"📝 {at['register']}"])
 
-    
     with tab1:
         with st.form("l_form"):
             e = st.text_input(at['email'])
@@ -188,8 +179,7 @@ if auth_status == "logged_out":
                     else:
                         st.error(f"Kayıt Hatası: {ex}")
 
-
-# GİRİŞ YAPILMADIYSA UYGULAMANIN GERİ KALANINI DURDUR (GATEKEEPER)
+# GATEKEEPER - GİRİŞ YAPILMADIYSA UYGULAMANIN GERİ KALANINI DURDUR
 if auth_status != "paid":
     st.stop()
 
@@ -620,7 +610,7 @@ ui_languages = {
         "tones": ["标准专业", "顶级豪宅", "投资价值", "现代简约", "家庭生活", "度假租赁", "商业办公"],
         "ph_prop": "例如：3室1厅公寓、豪华别墅...",
         "ph_price": "例如：$850,000 或 $2,000/月...",
-        "ph_loc": "例如：上海浦東新区、伦敦...",
+        "ph_loc": "例如：上海浦东新区、伦敦...",
         "bedrooms": "卧室",
         "bathrooms": "卫生间",
         "area": "面积",
@@ -797,14 +787,11 @@ with st.sidebar:
     else:
         st.markdown("<div style='text-align:center; padding:0.8rem 0 0.5rem;'><span style='font-size:1.8rem; font-weight:800; color:#0f172a;'>SarSa</span><span style='font-size:1.8rem; font-weight:800; background:linear-gradient(135deg,#3b82f6,#8b5cf6); -webkit-background-clip:text;-webkit-text-fill-color:transparent;'> AI</span></div>", unsafe_allow_html=True)
 
-        # TEST VE KULLANIM KOLAYLIĞI İÇİN ÇIKIŞ YAP BUTONU
     if st.button("🚪 Çıkış Yap / Logout", use_container_width=True):
         supabase.auth.sign_out()
-        # Çıkış yaparken hafızayı siliyoruz (BUNLAR YENİ EKLENDİ)
         st.session_state.is_logged_in = False
         st.session_state.user_email = None
         st.rerun()
-
 
     current_ui_lang = st.selectbox("🌐 Interface Language", list(ui_languages.keys()), index=0)
     t = ui_languages[current_ui_lang]
@@ -828,7 +815,6 @@ with st.sidebar:
         "4": t["tab_tech"], "5": t["tab_email"], "6": t["tab_seo"], "7": t["tab_photo"]
     }
     
-    # Selection logic: default to all if none selected
     st.session_state.selected_sections = st.multiselect(
         "", options=list(available_sections.keys()), 
         format_func=lambda x: available_sections[x],
@@ -909,7 +895,6 @@ if uploaded_files:
                     sec[n] = content
                     break
 
-        # Only show tabs that were selected and have content
         active_tabs_indices = [int(i)-1 for i in st.session_state.selected_sections if sec[i]]
         if active_tabs_indices:
             tab_labels = [f"📝 {t['tab_main']}", f"📱 {t['tab_social']}", f"🎬 {t['tab_video']}", f"⚙️ {t['tab_tech']}", f"✉️ {t['tab_email']}", f"🔍 {t['tab_seo']}", f"📸 {t['tab_photo']}"]
