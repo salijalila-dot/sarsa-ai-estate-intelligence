@@ -118,8 +118,6 @@ def get_status():
         return "logged_out", None
 
 # ─── UI FLOW ───────────────────────────────────────────────────────────────
-auth_status, user_email = get_status()
-
 # --- ŞİFRE SIFIRLAMA YAKALAYICI ---
 query_params = st.query_params
 if "type" in query_params and query_params["type"] == "recovery":
@@ -138,6 +136,8 @@ if "type" in query_params and query_params["type"] == "recovery":
 
 def update_lang():
     st.session_state.auth_lang = st.session_state.lang_selector
+
+auth_status, user_email = get_status()
 
 if auth_status != "paid":
     st.selectbox("🌐 Select Language / Dil Seçin", list(auth_texts.keys()), 
