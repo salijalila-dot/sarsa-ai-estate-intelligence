@@ -118,33 +118,50 @@ def get_status():
         return "logged_out", None
 
 # ─── UI FLOW ───────────────────────────────────────────────────────────────
-# --- ŞİFRE SIFIRLAMA YAKALAYICI ---
+
+# 1. ŞİFRE SIFIRLAMA YAKALAYICI (En Üstte Olmalı!)
 query_params = st.query_params
 if "type" in query_params and query_params["type"] == "recovery":
     st.warning("🔒 Reset Your Password")
     with st.form("recovery_form"):
-        new_password_recovery = st.text_input("New Password", type="password")
-        if st.form_submit_button("Set New Password"):
-            try:
-                supabase.auth.update_user({"password": new_password_recovery})
-                st.success("Password updated! You can now login.")
-                st.query_params.clear() # Linkteki kodları temizle
-                st.info("Please login with your new password.")
-            except Exception as e:
-                st.error(f"Error: {e}")
-    st.stop() # Diğer giriş ekranlarını gösterme, sadece buna odaklan
+        # Şifre kriterini (en az 6 karakter) buraya ekledik ki hata almayasın
+        new_password_recovery = st.text_input("New Password", type="password", help="Minimum 6 characters")
+        if st.form_submit_button("Set New Password & Login"):
+            if len(new_password_recovery) < 6:
+                st.error("❌ Password must be at least 6 characters!")
+            else:
+                try:
+                    # Supabase şifreyi günceller ve oturumu açar
+                    supabase.auth.update_user({"password": new_password_recovery})
+                    st.success("✅ Password updated! You are being redirected...")
+                    
+                    # URL'deki recovery kodlarını temizliyoruz
+                    st.query_params.clear() 
+                    
+                    # Streamlit'e her şeyin değiştiğini söylemek için ufak bir buton ve rerun
+                    if st.button("Go to Dashboard"):
+                        st.rerun()
+                    st.rerun() # Otomatik tetikleme
+                except Exception as e:
+                    st.error(f"Error: {e}")
+    st.stop() # Kurtarma modundaysan aşağıdaki giriş formlarını hiç yükleme
 
+# 2. DİL FONKSİYONU
 def update_lang():
     st.session_state.auth_lang = st.session_state.lang_selector
 
+# 3. DURUM KONTROLÜ (Recovery'den sonra çalışmalı)
 auth_status, user_email = get_status()
 
+# 4. GİRİŞ YAPILMADIYSA DİL SEÇİCİYİ GÖSTER
 if auth_status != "paid":
     st.selectbox("🌐 Select Language / Dil Seçin", list(auth_texts.keys()), 
-                 index=list(auth_texts.keys()).index(st.session_state.auth_lang),
+                 index=list(auth_texts.keys()).index(st.session_state.auth_lang) if st.session_state.auth_lang in auth_texts else 0,
                  key="lang_selector", on_change=update_lang)
 
+# 5. METİNLERİ YÜKLE
 at = auth_texts.get(st.session_state.auth_lang, auth_texts["English"])
+
 
 if auth_status == "logged_out":
     col_logo, col_text = st.columns([1, 6])
