@@ -941,7 +941,7 @@ with st.sidebar:
                     st.error(f"{e}")
 
         st.markdown("---")
-                st.subheader(t.get('danger_zone', 'Danger Zone'))
+        st.subheader(t.get('danger_zone', 'Danger Zone'))
         confirm_delete = st.checkbox(t.get('delete_confirm', 'Confirm Delete'))
         
         if st.button(f"❌ {t.get('btn_delete', 'Delete')}", type="primary", use_container_width=True):
