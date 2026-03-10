@@ -879,14 +879,48 @@ with st.sidebar:
     else:
         st.markdown("<div style='text-align:center; padding:0.8rem 0 0.5rem;'><span style='font-size:1.8rem; font-weight:800; color:#0f172a;'>SarSa</span><span style='font-size:1.8rem; font-weight:800; background:linear-gradient(135deg,#3b82f6,#8b5cf6); -webkit-background-clip:text;-webkit-text-fill-color:transparent;'> AI</span></div>", unsafe_allow_html=True)
 
-    if st.button("🚪 Çıkış Yap / Logout", use_container_width=True):
+    # --- Üst Kısım: Dil Seçimi ve Çıkış ---
+    current_ui_lang = st.selectbox("🌐 Interface Language", list(ui_languages.keys()), 
+                                   index=list(ui_languages.keys()).index(st.session_state.auth_lang) if st.session_state.auth_lang in ui_languages else 0)
+    t = ui_languages[current_ui_lang]
+    st.session_state.auth_lang = current_ui_lang # Senkronizasyon
+    
+    if st.button(f"🚪 {t.get('logout', 'Logout')}", use_container_width=True):
         supabase.auth.sign_out()
         st.session_state.is_logged_in = False
         st.session_state.user_email = None
         st.rerun()
 
-    current_ui_lang = st.selectbox("🌐 Interface Language", list(ui_languages.keys()), index=0)
-    t = ui_languages[current_ui_lang]
+    st.markdown("---")
+    
+    # --- Yeni: Hesap Ayarları Paneli (Dinamik) ---
+    with st.expander(f"⚙️ {t.get('acc_settings', 'Account Settings')}"):
+        st.subheader(t.get('update_pw', 'Update Password'))
+        new_pw = st.text_input(t.get('new_pw', 'New Password'), type="password", key="settings_new_pw")
+        if st.button(t.get('btn_update', 'Update')):
+            if len(new_pw) < 6:
+                st.warning(t.get('pw_min_err', 'Min 6 chars'))
+            else:
+                try:
+                    supabase.auth.update_user({"password": new_pw})
+                    st.success(t.get('saved_msg', 'OK'))
+                except Exception as e:
+                    st.error(f"{e}")
+
+        st.markdown("---")
+        st.subheader(t.get('danger_zone', 'Danger Zone'))
+        confirm_delete = st.checkbox(t.get('delete_confirm', 'Confirm'))
+        if st.button(f"❌ {t.get('btn_delete', 'Delete')}", type="primary", use_container_width=True):
+            if confirm_delete:
+                try:
+                    user_id = supabase.auth.get_user().user.id
+                    # Not: Bu RPC fonksiyonunun veritabanında tanımlı olması gerekir
+                    supabase.rpc('soft_delete_profile', {'p_id': user_id, 'p_actor': user_id}).execute()
+                    supabase.auth.sign_out()
+                    st.session_state.is_logged_in = False
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"{e}")
 
     st.markdown("---")
     st.header(t["settings"])
@@ -922,13 +956,14 @@ with st.sidebar:
     with col3: st.session_state.area_size = st.text_input(t["area"], value=st.session_state.area_size, placeholder=t["ph_area"])
     with col4: st.session_state.year_built = st.text_input(t["year_built"], value=st.session_state.year_built, placeholder=t["ph_year"])
 
-    st.session_state.furnishing_idx = t["furnishing_opts"].index(st.selectbox(t["furnishing"], t["furnishing_opts"], index=st.session_state.furnishing_idx))
-    st.session_state.audience_idx = t["audience_opts"].index(st.selectbox(t["target_audience"], t["audience_opts"], index=st.session_state.audience_idx))
+    st.session_state.furnishing_idx = t["furnishing_opts"].index(st.selectbox(t["furnishing"], t["furnishing_opts"], index=st.session_state.furnishing_idx if st.session_state.furnishing_idx < len(t["furnishing_opts"]) else 0))
+    st.session_state.audience_idx = t["audience_opts"].index(st.selectbox(t["target_audience"], t["audience_opts"], index=st.session_state.audience_idx if st.session_state.audience_idx < len(t["audience_opts"]) else 0))
 
     if st.button(f"🗑️ {t['clear_btn']}", use_container_width=True):
         for k in ["uretilen_ilan", "prop_type", "price", "location", "bedrooms", "bathrooms", "area_size", "year_built", "custom_inst"]: st.session_state[k] = ""
         st.session_state.selected_sections = []
         st.rerun()
+
 
 # ─── MAIN CONTENT ─────────────────────────────────────────────────────────────
 st.markdown(f"<h1>🏢 {t['title']}</h1>", unsafe_allow_html=True)
