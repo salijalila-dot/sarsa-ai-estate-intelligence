@@ -150,7 +150,7 @@ if auth_status == "logged_out":
     
     tab1, tab2 = st.tabs([f"🔑 {at['login']}", f"📝 {at['register']}"])
 
-    with tab1:
+        with tab1:
         with st.form("l_form"):
             e = st.text_input(at['email'])
             p = st.text_input(at['password'], type="password")
@@ -162,7 +162,7 @@ if auth_status == "logged_out":
                     if res.user:
                         st.session_state.is_logged_in = True
                         st.session_state.user_email = e
-                        st.success("Giriş başarılı!")
+                        st.success("✅")
                         st.rerun()
                 except Exception as ex:
                     error_msg = str(ex)
@@ -171,7 +171,21 @@ if auth_status == "logged_out":
                     elif "Invalid login credentials" in error_msg:
                         st.error(f"❌ {at['error_login']}")
                     else:
-                        st.error(f"Sistem Hatası: {error_msg}")
+                        st.error(f"{error_msg}")
+
+        # --- ŞİFRE SIFIRLAMA (DİNAMİK) ---
+        with st.expander(f"🔑 {at.get('forgot_pw', 'Forgot Password?')}"):
+            reset_email = st.text_input(at['email'], key="reset_email_input")
+            if st.button(at.get('btn_reset', 'Send Link'), use_container_width=True):
+                if reset_email:
+                    try:
+                        supabase.auth.reset_password_for_email(reset_email)
+                        st.info(at.get('reset_success', 'Success!'))
+                    except Exception as e:
+                        st.error(f"{e}")
+                else:
+                    st.warning("Please enter your email.")
+
 
     with tab2:
         with st.form("r_form"):
