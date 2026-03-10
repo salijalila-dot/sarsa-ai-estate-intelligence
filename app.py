@@ -940,17 +940,18 @@ with st.sidebar:
 
     st.markdown("---")
     
-    # --- Yeni: Hesap Ayarları Paneli (Dinamik) ---
+        # --- Yeni: Hesap Ayarları Paneli (Dinamik) ---
     with st.expander(f"⚙️ {t.get('acc_settings', 'Account Settings')}"):
         st.subheader(t.get('update_pw', 'Update Password'))
         new_pw = st.text_input(t.get('new_pw', 'New Password'), type="password", key="settings_new_pw")
-        
-     if st.button(t.get('btn_update', 'Update Now'), key="settings_update_btn"):
+
+        # HİZALAMA DÜZELTİLDİ: Bu buton artık üstteki input ile tam hizada
+        if st.button(t.get('btn_update', 'Update Now'), key="settings_update_btn"):
             if len(new_pw) < 6:
                 st.warning(t.get('pw_min_err', 'Min 6 chars'))
             else:
                 try:
-                    # KRİTİK DÜZELTME: Önce aktif oturumu "çek" ve doğrula
+                    # Oturumu tazeleyerek "Auth session missing" hatasını engelliyoruz
                     sess = supabase.auth.get_session()
                     if sess:
                         supabase.auth.update_user({"password": new_pw})
@@ -958,29 +959,24 @@ with st.sidebar:
                     else:
                         st.error("Oturum zaman aşımına uğradı, lütfen tekrar giriş yapın.")
                 except Exception as e:
-                    # Hata mesajı eğer "Auth session missing" ise kullanıcıya anlamlı bilgi ver
                     st.error(f"Sistem Hatası: {e}")
-
 
         st.markdown("---")
         st.subheader(t.get('danger_zone', 'Danger Zone'))
         confirm_delete = st.checkbox(t.get('delete_confirm', 'Confirm Delete'))
-        
-        if st.button(f"❌ {t.get('btn_delete', 'Delete')}", type="primary", use_container_width=True):
+
+        if st.button(f"❌ {t.get('btn_delete', 'Delete')}", type="primary", use_container_width=True, key="real_delete_btn"):
             if confirm_delete:
                 try:
-                    # Mevcut kullanıcı bilgisini al
                     user_resp = supabase.auth.get_user()
                     if user_resp and user_resp.user:
                         u_id = user_resp.user.id
-                        
-                        # Supabase'e yazdığımız güvenli fonksiyonu çağırıyoruz
+                        # RPC çağrısı ile güvenli silme
                         supabase.rpc('soft_delete_profile', {
                             'p_id': u_id, 
                             'p_actor': u_id
                         }).execute()
                         
-                        # Çıkış yap ve temizle
                         supabase.auth.sign_out()
                         st.session_state.is_logged_in = False
                         st.session_state.user_email = None
