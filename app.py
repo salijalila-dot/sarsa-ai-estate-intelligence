@@ -927,15 +927,16 @@ with st.sidebar:
     with st.expander(f"⚙️ {t.get('acc_settings', 'Account Settings')}"):
         st.subheader(t.get('update_pw', 'Update Password'))
         new_pw = st.text_input(t.get('new_pw', 'New Password'), type="password", key="settings_new_pw")
-        if         if st.button(t.get('btn_update', 'Update')):
+        
+        if st.button(t.get('btn_update', 'Update Now'), key="settings_update_btn"):
             if len(new_pw) < 6:
                 st.warning(t.get('pw_min_err', 'Min 6 chars'))
             else:
                 try:
-                    # ÇÖZÜM: Önce oturumu tazeliyoruz, sonra güncelliyoruz
-                    supabase.auth.get_session() 
+                    # Oturumu tazele ve şifreyi gönder
+                    supabase.auth.get_session()
                     supabase.auth.update_user({"password": new_pw})
-                    st.success(t.get('saved_msg', 'OK'))
+                    st.success(t.get('saved_msg', 'Saved!'))
                 except Exception as e:
                     st.error(f"{e}")
 
