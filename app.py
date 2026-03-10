@@ -945,20 +945,29 @@ with st.sidebar:
         if st.button(f"❌ {t.get('btn_delete', 'Delete')}", type="primary", use_container_width=True):
             if confirm_delete:
                 try:
-                    # ÇÖZÜM: Önce kullanıcı var mı diye güvenli kontrol yapıyoruz
-                    user_data = supabase.auth.get_user()
-                    if user_data and user_data.user:
-                        user_id = user_data.user.id
-                        supabase.rpc('soft_delete_profile', {'p_id': user_id, 'p_actor': user_id}).execute()
+                    # Mevcut kullanıcıyı güvenli bir şekilde alıyoruz
+                    user_resp = supabase.auth.get_user()
+                    if user_resp and user_resp.user:
+                        user_id = user_resp.user.id
+                        
+                        # Veritabanındaki fonksiyonu çağırıyoruz
+                        # p_actor kısmına da user_id veriyoruz çünkü işlemi yapan kendisi
+                        supabase.rpc('soft_delete_profile', {
+                            'p_id': user_id, 
+                            'p_actor': user_id
+                        }).execute()
+                        
+                        # Uygulamadan çıkış yap ve her şeyi temizle
                         supabase.auth.sign_out()
                         st.session_state.is_logged_in = False
                         st.session_state.user_email = None
-                        st.success("Account deleted.")
+                        st.success("Your account has been permanently deleted.")
                         st.rerun()
                     else:
-                        st.error("Session expired. Please login again to delete account.")
+                        st.error("Authentication error. Please log in again.")
                 except Exception as e:
-                    st.error(f"{e}")
+                    # Eğer yetki hatası veya başka bir hata olursa burada yakalanacak
+                    st.error(f"Error during deletion: {e}")
 
     st.markdown("---")
     st.header(t["settings"])
