@@ -150,7 +150,7 @@ if auth_status == "logged_out":
     
     tab1, tab2 = st.tabs([f"🔑 {at['login']}", f"📝 {at['register']}"])
 
-        with tab1:
+    with tab1:
         with st.form("l_form"):
             e = st.text_input(at['email'])
             p = st.text_input(at['password'], type="password")
