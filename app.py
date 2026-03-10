@@ -940,34 +940,34 @@ with st.sidebar:
                     st.error(f"{e}")
 
         st.markdown("---")
-        st.subheader(t.get('danger_zone', 'Danger Zone'))
-        confirm_delete = st.checkbox(t.get('delete_confirm', 'Confirm'))
+                st.subheader(t.get('danger_zone', 'Danger Zone'))
+        confirm_delete = st.checkbox(t.get('delete_confirm', 'Confirm Delete'))
+        
         if st.button(f"❌ {t.get('btn_delete', 'Delete')}", type="primary", use_container_width=True):
             if confirm_delete:
                 try:
-                    # Mevcut kullanıcıyı güvenli bir şekilde alıyoruz
+                    # Mevcut kullanıcı bilgisini al
                     user_resp = supabase.auth.get_user()
                     if user_resp and user_resp.user:
-                        user_id = user_resp.user.id
+                        u_id = user_resp.user.id
                         
-                        # Veritabanındaki fonksiyonu çağırıyoruz
-                        # p_actor kısmına da user_id veriyoruz çünkü işlemi yapan kendisi
+                        # Supabase'e yazdığımız güvenli fonksiyonu çağırıyoruz
                         supabase.rpc('soft_delete_profile', {
-                            'p_id': user_id, 
-                            'p_actor': user_id
+                            'p_id': u_id, 
+                            'p_actor': u_id
                         }).execute()
                         
-                        # Uygulamadan çıkış yap ve her şeyi temizle
+                        # Çıkış yap ve temizle
                         supabase.auth.sign_out()
                         st.session_state.is_logged_in = False
                         st.session_state.user_email = None
-                        st.success("Your account has been permanently deleted.")
+                        st.success("Account deleted.")
                         st.rerun()
-                    else:
-                        st.error("Authentication error. Please log in again.")
                 except Exception as e:
-                    # Eğer yetki hatası veya başka bir hata olursa burada yakalanacak
-                    st.error(f"Error during deletion: {e}")
+                    st.error(f"Error: {e}")
+            else:
+                st.warning("Please confirm the deletion first.")
+
 
     st.markdown("---")
     st.header(t["settings"])
