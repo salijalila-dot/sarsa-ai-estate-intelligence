@@ -189,6 +189,9 @@ if auth_status == "logged_out":
                         st.error(f"Kayıt Hatası: {ex}")
 
 
+# GİRİŞ YAPILMADIYSA UYGULAMANIN GERİ KALANINI DURDUR (GATEKEEPER)
+if auth_status != "paid":
+    st.stop()
 
 
 # ─── AI CONFIGURATION ───────────────────────────────────────────────────────
