@@ -289,6 +289,7 @@ with st.sidebar:
 
     current_tone_idx = t["tones"].index(st.session_state.tone) if st.session_state.tone in t["tones"] else 0
     st.session_state.tone = st.selectbox(t["tone"], t["tones"], index=current_tone_idx)
+    st.session_state.audience_idx = st.selectbox(t["target_audience"], range(len(t["audience_opts"])), index=st.session_state.audience_idx, format_func=lambda x: t["audience_opts"][x])
     
     # Ekstra Mülk Detayları (İkinci koddaki eksikler eklendi)
     with st.expander(f"➕ {t['extra_details']}"):
@@ -297,7 +298,6 @@ with st.sidebar:
         st.session_state.area_size = st.text_input(t["area"], value=st.session_state.area_size, placeholder=t["ph_area"])
         st.session_state.year_built = st.text_input(t["year_built"], value=st.session_state.year_built, placeholder=t["ph_year"])
         st.session_state.furnishing_idx = st.selectbox(t["furnishing"], range(len(t["furnishing_opts"])), index=st.session_state.furnishing_idx, format_func=lambda x: t["furnishing_opts"][x])
-        st.session_state.audience_idx = st.selectbox(t["target_audience"], range(len(t["audience_opts"])), index=st.session_state.audience_idx, format_func=lambda x: t["audience_opts"][x])
 
     st.session_state.custom_inst = st.text_area(f"📝 {t['custom_inst']}", value=st.session_state.custom_inst, placeholder=t["custom_inst_ph"], height=100)
 
@@ -364,8 +364,4 @@ else:
             <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">🎬 {t['tab_video']}</span>
             <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">⚙️ {t['tab_tech']}</span>
             <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">✉️ {t['tab_email']}</span>
-            <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">🔍 {t['tab_seo']}</span>
-            <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">📸 {t.get('tab_photo', 'Photo Guide')}</span>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+            <span
