@@ -29,6 +29,23 @@ for key, val in [
     if key not in st.session_state:
         st.session_state[key] = val
 
+# ─── ACCOUNT DELETE CONFIRM HANDLER ─────────────────────────
+query_params = st.query_params
+if "action" in query_params and query_params.get("action") == "confirm_delete":
+    if "token" in query_params:
+        token = query_params.get("token")
+        try:
+            import requests
+            EDGE_URL = st.secrets["SUPABASE_URL"] + "/functions/v1/finalize_delete_account"
+            r = requests.post(EDGE_URL, json={"token": token}, timeout=10)
+            if r.status_code == 200:
+                st.success("✅ Your account has been permanently deleted.")
+            else:
+                st.error("Delete confirmation failed.")
+        except Exception as e:
+            st.error(f"Delete error: {e}")
+    st.stop()
+
 # ─── TEXT DICTIONARIES (9 LANGUAGES - FULL) ────────────────────────────────
 auth_texts = {
     "English": { "access": "SarSa AI Access", "login": "Login", "register": "Register", "email": "Email", "password": "Password", "btn_login": "Login", "btn_reg": "Create Account", "success_reg": "Registration successful! Check your email to verify your account.", "error_login": "Login failed. You are not registered, or your Email/Password is incorrect.", "verify_msg": "⚠️ Please verify your email:", "btn_check": "I verified, let me in", "unpaid_msg": "Subscription required.", "upgrade_title": "🚀 Professional Plan", "pay_btn": "Subscribe Now", "welcome_title": "Welcome to SarSa AI", "welcome_desc": "The All-in-One Visual Property Intelligence & Global Sales Automation platform. Transform your property photos into professional assets in seconds.", "login_prompt": "Log in to use the application", "forgot_pw": "Forgot Password?", "btn_reset": "Send Reset Link", "reset_success": "Reset link sent to your email." },
@@ -63,7 +80,7 @@ if "code" in query_params:
         supabase.auth.exchange_code_for_session({"auth_code": query_params["code"]})
         st.session_state.is_logged_in = True
         st.session_state.recovery_mode = True
-        st.query_params.clear()
+        st.query_params = {}
         st.rerun()
     except Exception as e:
         st.error(f"Token error: {e}")
@@ -71,7 +88,7 @@ if "code" in query_params:
 # Eski tip hash yerine query_params üzerinden recovery kontrolü
 if "type" in query_params and query_params["type"] == "recovery":
     st.session_state.recovery_mode = True
-    st.query_params.clear()
+    st.query_params = {}
     st.rerun()
 
 if st.session_state.recovery_mode:
@@ -203,7 +220,7 @@ if auth_status != "paid":
             email_reset = st.text_input(at["email"])
             if st.form_submit_button(at["btn_reset"]):
                 try:
-                    supabase.auth.reset_password_for_email(email_reset)
+                    supabase.auth.reset_password_for_email(email_reset, {"redirect_to": "https://sarsa-ai-estateintelligence.streamlit.app/"})
                     st.success(at["reset_success"])
                 except Exception as e:
                     st.error(f"Error: {e}")
@@ -368,4 +385,3 @@ else:
             <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">📸 {t.get('tab_photo', 'Photo Guide')}</span>
         </div>
     </div>
-    """, unsafe_allow_html=True)
