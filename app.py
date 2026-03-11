@@ -358,5 +358,14 @@ else:
     <div style='text-align:center; padding: 3rem; background: #f8fafc; border-radius: 12px; border: 2px dashed #cbd5e1; margin-top: 2rem;'>
         <h3 style='color: #475569;'>🏘️ {t.get('result', 'Executive Preview')}</h3>
         <p style='color: #94a3b8;'>{t['empty']}</p>
+        <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:1.4rem;">
+            <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">📝 {t['tab_main']}</span>
+            <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">📱 {t['tab_social']}</span>
+            <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">🎬 {t['tab_video']}</span>
+            <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">⚙️ {t['tab_tech']}</span>
+            <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">✉️ {t['tab_email']}</span>
+            <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">🔍 {t['tab_seo']}</span>
+            <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">📸 {t.get('tab_photo', 'Photo Guide')}</span>
+        </div>
     </div>
     """, unsafe_allow_html=True)
