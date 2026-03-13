@@ -23,7 +23,7 @@ st.set_page_config(
     page_icon="🏢", layout="wide"
 )
 
-@st.cache_resource(experimental_allow_widgets=True)
+@st.cache_resource
 def get_cookie_manager():
     if stx is not None:
         return stx.CookieManager()
