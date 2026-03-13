@@ -45,6 +45,20 @@ SUPABASE_URL: str = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY: str = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+import streamlit as st
+
+# URL'deki parametreleri kontrol et
+params = st.query_params
+
+if "code" in params:
+    # Eğer mailden bir kod gelmişse, bu kullanıcıyı doğrula
+    auth_code = params["code"]
+    try:
+        supabase.auth.exchange_code_for_session({"auth_code": auth_code})
+        st.success("Oturum doğrulandı, şimdi yeni şifrenizi belirleyebilirsiniz.")
+    except Exception as e:
+        st.error(f"Oturum hatası: {e}")
+
 # ─── SESSION STATE INITIALIZATION ─────────────────────────────────────────────
 if 'auth_lang'              not in st.session_state: st.session_state.auth_lang              = "English"
 if 'is_logged_in'           not in st.session_state: st.session_state.is_logged_in           = False
