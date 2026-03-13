@@ -45,72 +45,6 @@ SUPABASE_URL: str = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY: str = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-import streamlit as st
-from supabase import create_client
-
-# 1. Supabase Kurulumu
-url = st.secrets["SUPABASE_URL"]
-key = st.secrets["SUPABASE_KEY"]
-supabase = create_client(url, key)
-
-# --- JAVASCRIPT KÖPRÜSÜ (OTOMATİK ÇÖZÜM) ---
-# Bu kod, URL'deki # kısmını ? yapar, böylece Streamlit veriyi okuyabilir.
-st.components.v1.html(
-    """
-    <script>
-    var url = window.location.href;
-    if (url.indexOf("#") !== -1) {
-        var newUrl = url.replace("#", "?");
-        window.location.href = newUrl;
-    }
-    </script>
-    """,
-    height=0,
-)
-
-# 2. URL Parametrelerini Yakala
-params = st.query_params
-
-# URL'de access_token var mı bak (JS sayesinde artık görebiliyoruz)
-access_token = params.get("access_token")
-refresh_token = params.get("refresh_token")
-
-if access_token and refresh_token:
-    try:
-        # Supabase'e "Elimde bu tokenlar var, oturumu aç" diyoruz
-        supabase.auth.set_session(access_token, refresh_token)
-        st.success("Oturum başarıyla doğrulandı! Yeni şifrenizi girin.")
-    except Exception as e:
-        st.error(f"Oturum hatası: {e}")
-
-# --- ARAYÜZ ---
-new_password = st.text_input("Yeni Şifre Belirleyin", type="password")
-
-if st.button("Şifreyi Güncelle ve Giriş Yap"):
-    if new_password:
-        try:
-            # Artık session içeride olduğu için bu komut hatasız çalışacaktır
-            supabase.auth.update_user({"password": new_password})
-            st.success("Şifreniz başarıyla güncellendi! Yönlendiriliyorsunuz...")
-            # İstersen buraya ana sayfaya yönlendirme ekleyebilirsin
-        except Exception as e:
-            st.error(f"Güncelleme hatası: {e}")
-    else:
-        st.warning("Lütfen bir şifre girin.")
-
-
-# URL'deki parametreleri kontrol et
-params = st.query_params
-
-if "code" in params:
-    # Eğer mailden bir kod gelmişse, bu kullanıcıyı doğrula
-    auth_code = params["code"]
-    try:
-        supabase.auth.exchange_code_for_session({"auth_code": auth_code})
-        st.success("Oturum doğrulandı, şimdi yeni şifrenizi belirleyebilirsiniz.")
-    except Exception as e:
-        st.error(f"Oturum hatası: {e}")
-
 # ─── SESSION STATE INITIALIZATION ─────────────────────────────────────────────
 if 'auth_lang'              not in st.session_state: st.session_state.auth_lang              = "English"
 if 'is_logged_in'           not in st.session_state: st.session_state.is_logged_in           = False
@@ -188,7 +122,7 @@ def is_email_registered(email: str) -> bool:
     except Exception:
         return True
 
-# ─── QUERY PARAM HANDLERS & ROUTING (Sorunların Çözüldüğü Ana Kısım) ──────────
+# ─── QUERY PARAM HANDLERS & ROUTING ───────────────────────────────────────────
 query_params = st.query_params
 action = query_params.get("action")
 
@@ -227,7 +161,7 @@ elif action == "reset_pw" or query_params.get("type") == "recovery":
     st.query_params.clear()
     st.rerun()
 
-# 4) Hesap Silme Onayı (Döngü Hatası Çözüldü)
+# 4) Hesap Silme Onayı
 elif action == "confirm_delete":
     token = query_params.get("token", "")
     try:
@@ -238,7 +172,6 @@ elif action == "confirm_delete":
             if datetime.now(timezone.utc) < expires_at:
                 try:
                     svc = create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_SERVICE_KEY"])
-                    # Kullanıcı yeni kayıt açmışsa eski user_id bulunamayabilir, hatayı görmezden geliyoruz.
                     svc.auth.admin.delete_user(record["user_id"])
                 except Exception:
                     pass 
@@ -798,7 +731,6 @@ if auth_status != "paid":
             pw_reg    = st.text_input(at["password"] + " (Min 6)", type="password")
             if st.form_submit_button(at["btn_reg"]):
                 try:
-                    # ÇÖZÜM: Redirect URL içine ?action=signup_confirm parametresi eklendi
                     supabase.auth.sign_up({
                         "email": email_reg,
                         "password": pw_reg,
@@ -827,7 +759,6 @@ if auth_status != "paid":
                             "No account found with this email address. Please register first."))
                     else:
                         try:
-                            # ÇÖZÜM: Redirect URL içine ?action=reset_pw parametresi eklendi
                             supabase.auth.reset_password_for_email(
                                 email_reset,
                                 {"redirect_to": "https://sarsa-ai-estateintelligence.streamlit.app/?action=reset_pw"}
@@ -969,25 +900,4 @@ if uploaded_files:
             st.warning("Please select at least one asset to generate from the sidebar.")
         else:
             with st.spinner(t.get('loading','Crafting your premium marketing ecosystem...')):
-                st.success("Talebiniz AI'a iletildi! Seçtiğiniz alanlar için içerikler hazırlanıyor.")
-            tabs = st.tabs(st.session_state.selected_sections)
-            for idx, selected_tab in enumerate(st.session_state.selected_sections):
-                with tabs[idx]:
-                    st.subheader(selected_tab)
-                    st.write(f"Bu alana {selected_tab} ile ilgili üretilen harika AI içerikleri gelecek.")
-                    st.button(f"📥 {t['download']} - {selected_tab}", key=f"dl_{idx}")
-else:
-    st.markdown(f"""
-    <div style='text-align:center;padding:3rem;background:#f8fafc;border-radius:12px;border:2px dashed #cbd5e1;margin-top:2rem;'>
-      <h3 style='color:#475569;'>🏘️ {t.get('result','Executive Preview')}</h3>
-      <p style='color:#94a3b8;'>{t['empty']}</p>
-      <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:1.4rem;">
-        <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">📝 {t['tab_main']}</span>
-        <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">📱 {t['tab_social']}</span>
-        <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">🎬 {t['tab_video']}</span>
-        <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">⚙️ {t['tab_tech']}</span>
-        <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">✉️ {t['tab_email']}</span>
-        <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">🔍 {t['tab_seo']}</span>
-        <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">📸 {t.get('tab_photo','Photo Guide')}</span>
-      </div>
-    </div>""", unsafe_allow_html=True)
+                st.success("Talebiniz AI'a iletildi! Seçtiğiniz
