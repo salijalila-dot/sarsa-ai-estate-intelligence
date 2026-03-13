@@ -46,6 +46,58 @@ SUPABASE_KEY: str = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 import streamlit as st
+from supabase import create_client
+
+# 1. Supabase Kurulumu
+url = st.secrets["SUPABASE_URL"]
+key = st.secrets["SUPABASE_KEY"]
+supabase = create_client(url, key)
+
+# --- JAVASCRIPT KÖPRÜSÜ (OTOMATİK ÇÖZÜM) ---
+# Bu kod, URL'deki # kısmını ? yapar, böylece Streamlit veriyi okuyabilir.
+st.components.v1.html(
+    """
+    <script>
+    var url = window.location.href;
+    if (url.indexOf("#") !== -1) {
+        var newUrl = url.replace("#", "?");
+        window.location.href = newUrl;
+    }
+    </script>
+    """,
+    height=0,
+)
+
+# 2. URL Parametrelerini Yakala
+params = st.query_params
+
+# URL'de access_token var mı bak (JS sayesinde artık görebiliyoruz)
+access_token = params.get("access_token")
+refresh_token = params.get("refresh_token")
+
+if access_token and refresh_token:
+    try:
+        # Supabase'e "Elimde bu tokenlar var, oturumu aç" diyoruz
+        supabase.auth.set_session(access_token, refresh_token)
+        st.success("Oturum başarıyla doğrulandı! Yeni şifrenizi girin.")
+    except Exception as e:
+        st.error(f"Oturum hatası: {e}")
+
+# --- ARAYÜZ ---
+new_password = st.text_input("Yeni Şifre Belirleyin", type="password")
+
+if st.button("Şifreyi Güncelle ve Giriş Yap"):
+    if new_password:
+        try:
+            # Artık session içeride olduğu için bu komut hatasız çalışacaktır
+            supabase.auth.update_user({"password": new_password})
+            st.success("Şifreniz başarıyla güncellendi! Yönlendiriliyorsunuz...")
+            # İstersen buraya ana sayfaya yönlendirme ekleyebilirsin
+        except Exception as e:
+            st.error(f"Güncelleme hatası: {e}")
+    else:
+        st.warning("Lütfen bir şifre girin.")
+
 
 # URL'deki parametreleri kontrol et
 params = st.query_params
