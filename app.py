@@ -1,4 +1,5 @@
 import streamlit as st
+import time
 from PIL import Image
 import google.generativeai as genai
 import os
@@ -8,7 +9,13 @@ import uuid
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-import streamlit.components.v1 as components
+
+# Çerez (Cookie) yönetimi için (Sayfa yenilemelerinde hafıza)
+try:
+    import extra_streamlit_components as stx
+except ImportError:
+    stx = None
+    st.warning("Gelişmiş hafıza (çerez) özellikleri için terminalde 'pip install extra-streamlit-components' çalıştırın.")
 
 # ─── PAGE CONFIG ──────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -16,58 +23,21 @@ st.set_page_config(
     page_icon="🏢", layout="wide"
 )
 
-# ─── HASH → QUERY PARAM REDIRECT (ROBUST) ────────────────────────────────────
-# Supabase implicit flow puts tokens in URL hash (#access_token=...&type=recovery)
-# Streamlit cannot read hash fragments — JS must detect & redirect to query params.
-# height=50 ensures the iframe actually renders and executes JS in all browsers.
-components.html("""
-<div id="sarsa-loader" style="
-    display:none; text-align:center; padding:12px 0;
-    font-family:'Segoe UI',sans-serif; font-size:13px; color:#64748b;">
-    🔐 Authenticating, please wait…
-</div>
-<script>
-(function() {
-    function doRedirect() {
-        try {
-            var parentLoc = window.parent.location;
-            var hash = parentLoc.hash;
-            if (!hash || hash.length <= 1) return false;
+@st.cache_resource(experimental_allow_widgets=True)
+def get_cookie_manager():
+    if stx is not None:
+        return stx.CookieManager()
+    return None
 
-            var params = new URLSearchParams(hash.substring(1));
-            var type   = params.get('type');
-            var token  = params.get('access_token');
-
-            if (token && (type === 'recovery' || type === 'signup')) {
-                var el = document.getElementById('sarsa-loader');
-                if (el) el.style.display = 'block';
-                // Clear hash first to avoid double-redirect, then navigate
-                var newUrl = parentLoc.origin + parentLoc.pathname + '?' + params.toString();
-                parentLoc.replace(newUrl);
-                return true;
-            }
-        } catch (e) {
-            // cross-origin guard – should not happen on same origin
-            console.warn('SarSa hash-redirect error:', e);
-        }
-        return false;
-    }
-
-    // Try immediately, then retry at 200 ms & 800 ms for slow-loading pages
-    if (!doRedirect()) {
-        setTimeout(function(){ if (!doRedirect()) setTimeout(doRedirect, 600); }, 200);
-    }
-})();
-</script>
-""", height=50)
+cookie_manager = get_cookie_manager()
 
 # ─── SUPABASE ─────────────────────────────────────────────────────────────────
 SUPABASE_URL: str = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY: str = st.secrets["SUPABASE_KEY"]
 supabase: Client  = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# ─── SESSION STATE ────────────────────────────────────────────────────────────
-_ss_defaults = {
+# ─── SESSION STATE & MEMORY ───────────────────────────────────────────────────
+_defaults = {
     "auth_lang":            "English",
     "is_logged_in":         False,
     "user_email":           None,
@@ -75,15 +45,38 @@ _ss_defaults = {
     "access_token":         None,
     "refresh_token":        None,
     "show_email_confirmed": False,
-    "uretilen_ilan": "", "prop_type": "", "price": "",
-    "location": "", "tone": "", "custom_inst": "",
-    "target_lang_input": "English", "bedrooms": "",
-    "bathrooms": "", "area_size": "", "year_built": "",
-    "furnishing_idx": 0, "audience_idx": 0, "selected_sections": [],
+    "uretilen_ilan":"", "prop_type":"", "price":"",
+    "location":"", "tone":"", "custom_inst":"",
+    "target_lang_input":"English", "bedrooms":"",
+    "bathrooms":"", "area_size":"", "year_built":"",
+    "furnishing_idx":0, "audience_idx":0, "selected_sections":[],
 }
-for k, v in _ss_defaults.items():
+
+for k, v in _defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
+
+# Çerezlerden (Cookie) verileri al ve Session'a aktar (Sayfa Yenileme Koruması)
+if cookie_manager:
+    saved_lang = cookie_manager.get(cookie="sarsa_auth_lang")
+    if saved_lang and saved_lang != st.session_state.auth_lang:
+        st.session_state.auth_lang = saved_lang
+    
+    saved_access = cookie_manager.get(cookie="sarsa_access_token")
+    saved_refresh = cookie_manager.get(cookie="sarsa_refresh_token")
+    if saved_access and not st.session_state.access_token:
+        st.session_state.access_token = saved_access
+        st.session_state.refresh_token = saved_refresh
+
+def save_auth_cookies(access, refresh):
+    if cookie_manager:
+        cookie_manager.set("sarsa_access_token", access, expires_at=datetime.now() + timedelta(days=7))
+        cookie_manager.set("sarsa_refresh_token", refresh, expires_at=datetime.now() + timedelta(days=7))
+
+def clear_auth_cookies():
+    if cookie_manager:
+        cookie_manager.delete("sarsa_access_token")
+        cookie_manager.delete("sarsa_refresh_token")
 
 # ─── RESTORE PERSISTENT SESSION ───────────────────────────────────────────────
 if st.session_state.access_token and not st.session_state.is_logged_in:
@@ -98,55 +91,43 @@ if st.session_state.access_token and not st.session_state.is_logged_in:
         st.session_state.access_token  = None
         st.session_state.refresh_token = None
         st.session_state.is_logged_in  = False
+        clear_auth_cookies()
 
 # ─── EMAIL: ACCOUNT DELETION ──────────────────────────────────────────────────
-def send_delete_confirmation_email(to_email: str, confirm_token: str, cancel_token: str):
-    app_url     = "https://sarsa-ai-estateintelligence.streamlit.app/"
-    confirm_url = f"{app_url}?action=confirm_delete&token={confirm_token}"
-    cancel_url  = f"{app_url}?action=cancel_delete&token={cancel_token}"
-    html_body   = f"""
-    <div style="font-family:'Arial',sans-serif;max-width:620px;margin:0 auto;
+def send_delete_confirmation_email(to_email, confirm_token, cancel_token):
+    base = "https://sarsa-ai-estateintelligence.streamlit.app/"
+    conf = f"{base}?action=confirm_delete&token={confirm_token}"
+    canc = f"{base}?action=cancel_delete&token={cancel_token}"
+    body = f"""
+    <div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;
                 padding:30px;background:#f8fafc;border-radius:16px;">
       <div style="background:white;border-radius:12px;padding:36px;
-                  box-shadow:0 4px 20px rgba(0,0,0,0.07);">
-        <div style="text-align:center;margin-bottom:28px;">
-          <h2 style="color:#0f172a;font-size:22px;margin:0;">⚠️ Account Deletion Request</h2>
-          <p style="color:#64748b;margin-top:8px;font-size:14px;">SarSa AI | Real Estate Intelligence</p>
-        </div>
+                  box-shadow:0 4px 20px rgba(0,0,0,.07);">
+        <h2 style="color:#0f172a;text-align:center;">⚠️ Account Deletion Request</h2>
+        <p style="color:#64748b;text-align:center;font-size:14px;">SarSa AI | Real Estate Intelligence</p>
         <p style="color:#334155;font-size:16px;line-height:1.6;">
-          We received a request to <strong>permanently delete</strong> the SarSa AI account
-          associated with:<br><strong style="color:#0f172a;">{to_email}</strong>
-        </p>
-        <p style="color:#ef4444;font-size:15px;font-weight:600;">
-          This action is irreversible. All your data will be permanently removed.
-        </p>
+          Permanent deletion requested for:<br>
+          <strong style="color:#0f172a;">{to_email}</strong></p>
+        <p style="color:#ef4444;font-weight:600;">This action is irreversible.</p>
         <div style="text-align:center;margin:32px 0;">
-          <a href="{confirm_url}"
-             style="background:#dc2626;color:white;padding:14px 32px;border-radius:10px;
-                    text-decoration:none;font-weight:700;font-size:16px;
-                    display:inline-block;margin-bottom:14px;">
-            Yes, Delete My Account
-          </a><br>
-          <a href="{cancel_url}"
-             style="background:#0f172a;color:white;padding:14px 32px;border-radius:10px;
-                    text-decoration:none;font-weight:700;font-size:16px;display:inline-block;">
-            Cancel – Keep My Account Safe
-          </a>
+          <a href="{conf}" style="background:#dc2626;color:white;padding:14px 32px;
+             border-radius:10px;text-decoration:none;font-weight:700;
+             display:inline-block;margin-bottom:14px;">Yes, Delete My Account</a><br>
+          <a href="{canc}" style="background:#0f172a;color:white;padding:14px 32px;
+             border-radius:10px;text-decoration:none;font-weight:700;
+             display:inline-block;">Cancel – Keep My Account Safe</a>
         </div>
-        <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;">
         <p style="color:#94a3b8;font-size:13px;text-align:center;">
-          This link expires in <strong>24 hours</strong>.<br>
-          If you did not request this, simply ignore this email.
-        </p>
+          Expires in 24 hours. If you didn't request this, ignore this email.</p>
       </div>
     </div>"""
     try:
-        msg            = MIMEMultipart("alternative")
+        msg = MIMEMultipart("alternative")
         msg["Subject"] = "SarSa AI – Confirm Account Deletion"
         msg["From"]    = st.secrets["SMTP_USER"]
         msg["To"]      = to_email
-        msg.attach(MIMEText(html_body, "html"))
-        host = st.secrets.get("SMTP_HOST", "smtp.gmail.com")
+        msg.attach(MIMEText(body, "html"))
+        host = st.secrets.get("SMTP_HOST","smtp.gmail.com")
         port = int(st.secrets.get("SMTP_PORT", 587))
         with smtplib.SMTP(host, port) as s:
             s.ehlo(); s.starttls()
@@ -156,8 +137,8 @@ def send_delete_confirmation_email(to_email: str, confirm_token: str, cancel_tok
     except Exception as e:
         return False, str(e)
 
-# ─── HELPER: EMAIL REGISTERED? ────────────────────────────────────────────────
-def is_email_registered(email: str) -> bool:
+# ─── HELPER: email registered? ────────────────────────────────────────────────
+def is_email_registered(email):
     try:
         svc   = create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_SERVICE_KEY"])
         users = svc.auth.admin.list_users()
@@ -165,58 +146,126 @@ def is_email_registered(email: str) -> bool:
     except Exception:
         return True
 
-# ─── QUERY PARAM HANDLERS ─────────────────────────────────────────────────────
+# ─── QUERY PARAMS (ROUTING) ───────────────────────────────────────────────────
 qp = st.query_params
 
-# ── Deletion: Confirm ─────────────────────────────────────────────────────────
+if qp.get("error"):
+    error_msg = qp.get("error_description", qp.get("error"))
+    st.error(f"⚠️ Verification Error: {error_msg}. The link may have expired.")
+    st.query_params.clear()
+
 if qp.get("action") == "confirm_delete":
-    token = qp.get("token", "")
+    token = qp.get("token","")
     try:
-        row = supabase.table("pending_deletions").select("*").eq("confirm_token", token).execute()
+        row = supabase.table("pending_deletions").select("*").eq("confirm_token",token).execute()
         if row.data:
             rec = row.data[0]
-            exp = datetime.fromisoformat(rec["expires_at"].replace("Z", "+00:00"))
+            exp = datetime.fromisoformat(rec["expires_at"].replace("Z","+00:00"))
             if datetime.now(timezone.utc) < exp:
                 try:
                     svc = create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_SERVICE_KEY"])
                     svc.auth.admin.delete_user(rec["user_id"])
                 except Exception as e:
                     st.error(f"Deletion error: {e}"); st.stop()
-                supabase.table("pending_deletions").delete().eq("confirm_token", token).execute()
+                supabase.table("pending_deletions").delete().eq("confirm_token",token).execute()
                 for k in ["is_logged_in","user_email","access_token","refresh_token"]:
-                    st.session_state[k] = False if k == "is_logged_in" else None
+                    st.session_state[k] = False if k=="is_logged_in" else None
+                clear_auth_cookies()
                 st.query_params.clear()
-                st.markdown("""
-                <div style='text-align:center;padding:5rem 2rem;'>
-                  <div style='font-size:5rem;margin-bottom:1rem;'>👋</div>
+                st.markdown("""<div style='text-align:center;padding:5rem 2rem;'>
+                  <div style='font-size:5rem;'>👋</div>
                   <h1 style='color:#0f172a;font-weight:800;'>Account Deleted</h1>
-                  <p style='color:#475569;font-size:1.15rem;margin-top:1rem;line-height:1.7;'>
+                  <p style='color:#475569;font-size:1.15rem;line-height:1.7;margin-top:1rem;'>
                     Your SarSa AI account has been <strong>permanently deleted</strong>.<br>
-                    All your data has been removed from our systems.</p>
+                    All data removed.</p>
                   <p style='color:#94a3b8;margin-top:2rem;'>You have been logged out.</p>
-                  <hr style='border:none;border-top:1px solid #e2e8f0;margin:2.5rem auto;max-width:400px;'>
-                  <p style='color:#cbd5e1;font-size:0.85rem;'>Thank you for using SarSa AI.</p>
                 </div>""", unsafe_allow_html=True)
                 st.stop()
             else:
-                st.error("Link expired (24 h). Please request deletion again from Account Settings.")
+                st.error("Link expired (24h). Please request deletion again."); st.stop()
         else:
-            st.error("Invalid or already-used link.")
+            st.error("Invalid or already-used link."); st.stop()
     except Exception as e:
-        st.error(f"Error: {e}")
-    st.stop()
+        st.error(f"Error: {e}"); st.stop()
 
-# ── Deletion: Cancel ──────────────────────────────────────────────────────────
 if qp.get("action") == "cancel_delete":
     try:
-        supabase.table("pending_deletions").delete().eq("cancel_token", qp.get("token","")).execute()
+        supabase.table("pending_deletions").delete().eq("cancel_token",qp.get("token","")).execute()
     except Exception:
         pass
     st.query_params.clear()
     st.success("Account deletion cancelled. Your account is safe! ✅")
-    import time; time.sleep(2); st.rerun()
+    time.sleep(2); st.rerun()
 
-# ─── TEXT DICTIONARIES (9 LANGUAGES) ──────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+# PKCE ?code= HANDLER — (TAMAMEN YENİLENMİŞ VE DROPPIN EKLENMİŞ BLOK)
+# ══════════════════════════════════════════════════════════════════════════════
+if qp.get("code"):
+    code = qp.get("code")
+    flow_type = qp.get("type", "recovery")
+
+    try:
+        # Koddan token alımı (explicit single-arg form)
+        resp = supabase.auth.exchange_code_for_session(code)
+    except Exception as e:
+        st.error(f"Auth exchange failed (Link expired or used): {e}")
+        st.query_params.clear()
+        time.sleep(2)
+        st.rerun()
+
+    access_token = None
+    refresh_token = None
+    try:
+        if isinstance(resp, dict):
+            sess = resp.get("data", {}).get("session") or resp.get("session") or resp.get("data")
+            if isinstance(sess, dict):
+                access_token = sess.get("access_token") or sess.get("accessToken")
+                refresh_token = sess.get("refresh_token") or sess.get("refreshToken")
+        else:
+            sess = getattr(resp, "session", None) or resp
+            access_token = getattr(sess, "access_token", None) or getattr(sess, "accessToken", None)
+            refresh_token = getattr(sess, "refresh_token", None) or getattr(sess, "refreshToken", None)
+    except Exception:
+        pass
+
+    if access_token:
+        try:
+            supabase.auth.set_session(access_token, refresh_token)
+            st.session_state.access_token = access_token
+            st.session_state.refresh_token = refresh_token
+            save_auth_cookies(access_token, refresh_token)
+        except Exception as e:
+            st.error(f"Could not set session after exchange: {e}")
+            st.query_params.clear()
+            st.stop()
+    else:
+        try:
+            gs = supabase.auth.get_session()
+            if isinstance(gs, dict):
+                sess = gs.get("data", {}).get("session") or gs.get("session") or gs.get("data")
+                if isinstance(sess, dict):
+                    st.session_state.access_token = sess.get("access_token")
+                    st.session_state.refresh_token = sess.get("refresh_token")
+            else:
+                st.session_state.access_token = getattr(gs, "access_token", None) or getattr(gs, "accessToken", None)
+                st.session_state.refresh_token = getattr(gs, "refresh_token", None) or getattr(gs, "refreshToken", None)
+        except Exception:
+            pass
+
+    st.query_params.clear()
+
+    # Yönlendirmeyi burada state üzerinden yapıyoruz
+    if flow_type == "signup":
+        st.session_state.show_email_confirmed = True
+        st.rerun()
+    else:
+        st.session_state.recovery_mode = True
+        if st.session_state.access_token:
+            st.session_state.is_logged_in = True
+        st.rerun()
+
+# ─── TEXT DICTS ───────────────────────────────────────────────────────────────
+# (Tüm dillerin buradadır, eksiltilmemiştir)
 auth_texts = {
     "English": {
         "login":"Login","register":"Register","email":"Email","password":"Password",
@@ -275,11 +324,11 @@ auth_texts = {
         "error_login":"Error. No estás registrado o tu Correo/Clave es incorrecto.",
         "verify_msg":"Por favor verifica tu email primero:",
         "welcome_title":"Bienvenido a SarSa AI",
-        "welcome_desc":"La plataforma todo en uno de Inteligencia Visual de Propiedades y Automatización de Ventas. Transforme sus fotos en activos profesionales en segundos.",
+        "welcome_desc":"La plataforma todo en uno de Inteligencia Visual de Propiedades. Transforme sus fotos en activos profesionales en segundos.",
         "login_prompt":"Inicie sesión para usar la aplicación",
         "forgot_pw":"¿Olvidaste tu contraseña?","btn_reset":"Enviar enlace",
         "reset_success":"¡Enlace enviado! Revisa tu bandeja de entrada.",
-        "reset_not_found":"No se encontró ninguna cuenta con este correo. Por favor regístrate.",
+        "reset_not_found":"No se encontró ninguna cuenta con este correo.",
         "reset_invalid_email":"Por favor ingresa un correo válido.",
         "confirmed_title":"✅ ¡Email Verificado Exitosamente!",
         "confirmed_msg":"Tu cuenta de SarSa AI ha sido confirmada y está lista para usar.",
@@ -300,11 +349,11 @@ auth_texts = {
         "error_login":"Login fehlgeschlagen. Nicht registriert oder E-Mail/Passwort falsch.",
         "verify_msg":"Bitte bestätigen Sie zuerst Ihre E-Mail:",
         "welcome_title":"Willkommen bei SarSa AI",
-        "welcome_desc":"Die All-in-One-Plattform für visuelle Immobilienintelligenz. Verwandeln Sie Ihre Immobilienfotos in Sekundenschnelle in professionelle Assets.",
+        "welcome_desc":"Die All-in-One-Plattform für visuelle Immobilienintelligenz. Verwandeln Sie Fotos in Sekundenschnelle in professionelle Assets.",
         "login_prompt":"Melden Sie sich an, um die App zu nutzen",
         "forgot_pw":"Passwort vergessen?","btn_reset":"Link senden",
         "reset_success":"Link gesendet! Überprüfen Sie Ihren Posteingang.",
-        "reset_not_found":"Kein Konto mit dieser E-Mail gefunden. Bitte zuerst registrieren.",
+        "reset_not_found":"Kein Konto mit dieser E-Mail gefunden.",
         "reset_invalid_email":"Bitte gültige E-Mail-Adresse eingeben.",
         "confirmed_title":"✅ E-Mail erfolgreich verifiziert!",
         "confirmed_msg":"Ihr SarSa AI-Konto wurde bestätigt und ist einsatzbereit.",
@@ -325,11 +374,11 @@ auth_texts = {
         "error_login":"Échec. Vous n'êtes pas inscrit ou Email/Mot de passe incorrect.",
         "verify_msg":"Veuillez d'abord vérifier votre email :",
         "welcome_title":"Bienvenue sur SarSa AI",
-        "welcome_desc":"La plateforme d'Intelligence Visuelle Immobilière et d'Automatisation des Ventes. Transformez vos photos en atouts professionnels en quelques secondes.",
+        "welcome_desc":"La plateforme d'Intelligence Visuelle Immobilière. Transformez vos photos en atouts professionnels en quelques secondes.",
         "login_prompt":"Connectez-vous pour utiliser l'application",
         "forgot_pw":"Mot de passe oublié ?","btn_reset":"Envoyer le lien",
         "reset_success":"Lien envoyé ! Vérifiez votre boîte de réception.",
-        "reset_not_found":"Aucun compte trouvé avec cet email. Veuillez d'abord vous inscrire.",
+        "reset_not_found":"Aucun compte trouvé avec cet email.",
         "reset_invalid_email":"Veuillez entrer une adresse email valide.",
         "confirmed_title":"✅ Email vérifié avec succès !",
         "confirmed_msg":"Votre compte SarSa AI a été confirmé et est prêt à l'emploi.",
@@ -350,11 +399,11 @@ auth_texts = {
         "error_login":"Falha. Não registado ou Email/Senha incorretos.",
         "verify_msg":"Por favor verifique primeiro o seu email:",
         "welcome_title":"Bem-vindo ao SarSa AI",
-        "welcome_desc":"A plataforma tudo-em-um de Inteligência Imobiliária Visual e Automação de Vendas. Transforme as suas fotos em ativos profissionais em segundos.",
+        "welcome_desc":"A plataforma tudo-em-um de Inteligência Imobiliária Visual. Transforme as suas fotos em ativos profissionais em segundos.",
         "login_prompt":"Faça login para usar o aplicativo",
         "forgot_pw":"Esqueceu a senha?","btn_reset":"Enviar link",
         "reset_success":"Link enviado! Verifique sua caixa de entrada.",
-        "reset_not_found":"Nenhuma conta encontrada com este email. Por favor registe-se primeiro.",
+        "reset_not_found":"Nenhuma conta encontrada com este email.",
         "reset_invalid_email":"Por favor insira um endereço de email válido.",
         "confirmed_title":"✅ Email Verificado com Sucesso!",
         "confirmed_msg":"Sua conta SarSa AI foi confirmada e está pronta para uso.",
@@ -379,7 +428,7 @@ auth_texts = {
         "login_prompt":"アプリを使用するにはログインしてください",
         "forgot_pw":"パスワードをお忘れですか？","btn_reset":"リンクを送信",
         "reset_success":"リセットリンクを送信しました！受信トレイをご確認ください。",
-        "reset_not_found":"このメールアドレスのアカウントが見つかりません。先に登録してください。",
+        "reset_not_found":"このメールアドレスのアカウントが見つかりません。",
         "reset_invalid_email":"有効なメールアドレスを入力してください。",
         "confirmed_title":"✅ メールが正常に認証されました！",
         "confirmed_msg":"SarSa AI アカウントが確認され、ご利用いただけます。",
@@ -429,7 +478,7 @@ auth_texts = {
         "login_prompt":"قم بتسجيل الدخول لاستخدام التطبيق",
         "forgot_pw":"نسيت كلمة السر؟","btn_reset":"إرسال رابط الاستعادة",
         "reset_success":"تم إرسال رابط إعادة التعيين! تحقق من صندوق الوارد.",
-        "reset_not_found":"لم يتم العثور على حساب بهذا البريد. يرجى التسجيل أولاً.",
+        "reset_not_found":"لم يتم العثور على حساب بهذا البريد.",
         "reset_invalid_email":"يرجى إدخال عنوان بريد إلكتروني صالح.",
         "confirmed_title":"✅ تم التحقق من البريد بنجاح!",
         "confirmed_msg":"تم تأكيد حساب SarSa AI الخاص بك وهو جاهز للاستخدام.",
@@ -475,7 +524,7 @@ ui_languages = {
         "update_pw":"Update Password","new_pw":"New Password","btn_update":"Update Now",
         "danger_zone":"Danger Zone","delete_confirm":"I want to permanently delete my account.",
         "btn_delete":"Delete Account","pw_min_err":"Minimum 6 characters required.",
-        "delete_email_sent":"Confirmation email sent! Check your inbox and click the link.",
+        "delete_email_sent":"Confirmation email sent! Check your inbox.",
         "delete_email_fail":"Failed to send email. Please check SMTP settings.",
     },
     "Türkçe": {
@@ -524,12 +573,12 @@ ui_languages = {
         "furnishing_opts":["No especificado","Completamente Amueblado","Semi-Amueblado","Sin Amueblar"],
         "target_audience":"Público Objetivo",
         "audience_opts":["Mercado General","Compradores de Lujo","Inversores & ROI","Extranjeros & Internacionales","Primeros Compradores","Mercado Vacacional","Inquilinos Comerciales"],
-        "custom_inst":"Notas Especiales y Características","custom_inst_ph":"Ej: Piscina privada, vistas al mar, domótica…",
+        "custom_inst":"Notas Especiales","custom_inst_ph":"Ej: Piscina privada, vistas al mar, domótica…",
         "btn":"GENERAR ACTIVOS SELECCIONADOS","upload_label":"Subir Fotos de la Propiedad",
         "result":"Vista Previa Ejecutiva","loading":"Creando su ecosistema de marketing premium…",
-        "empty":"Esperando imágenes para análisis. Suba fotos y complete los detalles a la izquierda.",
+        "empty":"Esperando imágenes. Suba fotos y complete los detalles a la izquierda.",
         "download":"Exportar Sección (TXT)","save_btn":"Guardar","saved_msg":"¡Guardado!",
-        "error":"Error:","clear_btn":"Limpiar Formulario","select_sections":"Seleccionar Secciones",
+        "error":"Error:","clear_btn":"Limpiar","select_sections":"Seleccionar Secciones",
         "tab_main":"Anuncio Premium","tab_social":"Kit de Redes Sociales","tab_video":"Guiones de Video",
         "tab_tech":"Especificaciones","tab_email":"Campaña de Email","tab_seo":"SEO & Web Copy","tab_photo":"Guía de Fotos",
         "label_main":"Texto de Ventas","label_social":"Contenido Social","label_video":"Guion de Video",
@@ -561,7 +610,7 @@ ui_languages = {
         "result":"Executive-Vorschau","loading":"Ihr Marketing-Ökosystem wird erstellt…",
         "empty":"Warte auf Bilder. Laden Sie Fotos hoch und füllen Sie die Details aus.",
         "download":"Abschnitt Exportieren (TXT)","save_btn":"Speichern","saved_msg":"Gespeichert!",
-        "error":"Fehler:","clear_btn":"Formular Zurücksetzen","select_sections":"Bereiche wählen",
+        "error":"Fehler:","clear_btn":"Zurücksetzen","select_sections":"Bereiche wählen",
         "tab_main":"Premium-Exposé","tab_social":"Social Media Kit","tab_video":"Videoskripte",
         "tab_tech":"Tech-Details","tab_email":"E-Mail-Kampagne","tab_seo":"SEO & Webtext","tab_photo":"Foto-Guide",
         "label_main":"Verkaufstext","label_social":"Social-Media-Content","label_video":"Videoskript",
@@ -623,9 +672,9 @@ ui_languages = {
         "custom_inst":"Notas Especiais e Destaques","custom_inst_ph":"Ex: Piscina privativa, vista panorâmica, casa inteligente…",
         "btn":"GERAR ATIVOS SELECIONADOS","upload_label":"Enviar Fotos do Imóvel",
         "result":"Pré-visualização Executiva","loading":"Preparando seu ecossistema de marketing…",
-        "empty":"Aguardando imagens. Envie fotos e preencha os detalhes à esquerda.",
+        "empty":"Aaguardando imagens. Envie fotos e preencha os detalhes à esquerda.",
         "download":"Exportar Secção (TXT)","save_btn":"Salvar","saved_msg":"Salvo!",
-        "error":"Erro:","clear_btn":"Limpar Formulário","select_sections":"Selecionar Seções",
+        "error":"Erro:","clear_btn":"Limpar","select_sections":"Selecionar Seções",
         "tab_main":"Anúncio Premium","tab_social":"Kit Redes Sociais","tab_video":"Roteiros de Vídeo",
         "tab_tech":"Especificações","tab_email":"Campanha de Email","tab_seo":"SEO & Web Copy","tab_photo":"Guia de Fotos",
         "label_main":"Texto de Vendas","label_social":"Conteúdo Social","label_video":"Roteiro de Vídeo",
@@ -736,7 +785,7 @@ ui_languages = {
     },
 }
 
-# ─── SHARED AUTH PAGE CSS ─────────────────────────────────────────────────────
+# ─── SHARED AUTH CSS ──────────────────────────────────────────────────────────
 _AUTH_CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
@@ -744,7 +793,7 @@ html,body,[class*="st-"]{ font-family:'Plus Jakarta Sans',sans-serif !important;
 .stApp{ background:linear-gradient(135deg,#f0f4f8 0%,#e8edf5 100%) !important; }
 #MainMenu,footer,div[data-testid="stDecoration"]{ display:none !important; }
 .block-container{
-    max-width:560px !important; margin:1.5rem auto !important;
+    max-width:540px !important; margin:2rem auto !important;
     background:white; border-radius:24px; padding:2.5rem !important;
     box-shadow:0 20px 60px rgba(0,0,0,0.08); border:1px solid #e2e8f0;
 }
@@ -759,90 +808,36 @@ html,body,[class*="st-"]{ font-family:'Plus Jakarta Sans',sans-serif !important;
     background:#1e293b !important; transform:translateY(-2px) !important;
     box-shadow:0 8px 25px rgba(15,23,42,0.35) !important;
 }
-</style>
-"""
+</style>"""
 
-# ─── HANDLE: EMAIL VERIFIED (signup) ─────────────────────────────────────────
-if qp.get("access_token") and qp.get("type") == "signup":
-    _at = qp.get("access_token","")
-    _rt = qp.get("refresh_token","")
-    if _at:
-        try: supabase.auth.set_session(_at, _rt)
-        except Exception: pass
-    st.session_state.show_email_confirmed = True
-    st.query_params.clear()
-    st.rerun()
+# ─── LANGUAGE HELPERS ─────────────────────────────────────────────────────────
+def _at(key, fb=""):
+    return auth_texts.get(st.session_state.auth_lang, auth_texts["English"]).get(key, fb)
 
-# ─── HANDLE: PASSWORD RECOVERY ───────────────────────────────────────────────
-if qp.get("access_token") and qp.get("type") == "recovery":
-    _at = qp.get("access_token","")
-    _rt = qp.get("refresh_token","")
-    if _at:
-        st.session_state.access_token  = _at
-        st.session_state.refresh_token = _rt
-        try: supabase.auth.set_session(_at, _rt)
-        except Exception: pass
-    st.session_state.recovery_mode = True
-    st.session_state.is_logged_in  = True
-    st.query_params.clear()
-    st.rerun()
+def _ut(key, fb=""):
+    return ui_languages.get(st.session_state.auth_lang, ui_languages["English"]).get(key, fb)
 
-# ─── HANDLE: PKCE code exchange ──────────────────────────────────────────────
-if qp.get("code"):
-    _code = qp["code"]
-    _sd   = None
-    for _arg in [{"auth_code": _code}, _code]:
-        try:  _sd = supabase.auth.exchange_code_for_session(_arg); break
-        except TypeError: continue
-        except Exception: break
-    if _sd:
-        try:
-            _s = getattr(_sd,"session",None) or _sd
-            _a = getattr(_s,"access_token",None)
-            _r = getattr(_s,"refresh_token",None)
-            if _a:
-                st.session_state.access_token  = _a
-                st.session_state.refresh_token = _r
-        except Exception: pass
-    if not st.session_state.access_token:
-        try:
-            _lv = supabase.auth.get_session()
-            if _lv:
-                st.session_state.access_token  = getattr(_lv,"access_token",None)
-                st.session_state.refresh_token = getattr(_lv,"refresh_token",None)
-        except Exception: pass
-    st.session_state.recovery_mode = True
-    st.session_state.is_logged_in  = True
-    st.query_params.clear()
-    st.rerun()
-
-# ─── HELPER: resolve texts for current language ───────────────────────────────
-def _at(key, fallback=""): 
-    return auth_texts.get(st.session_state.auth_lang, auth_texts["English"]).get(key, fallback)
-
-def _ut(key, fallback=""):
-    return ui_languages.get(st.session_state.auth_lang, ui_languages["English"]).get(key, fallback)
-
-# ─── LANGUAGE SELECTOR (used on auth-only pages) ─────────────────────────────
-def _lang_selector(key_suffix=""):
+def _lang_sel(widget_key):
     langs = list(auth_texts.keys())
     idx   = langs.index(st.session_state.auth_lang) if st.session_state.auth_lang in langs else 0
-    sel   = st.selectbox("🌐 Select Language / Dil Seçin", langs, index=idx, key=f"_ls_{key_suffix}")
+    sel   = st.selectbox("🌐 Select Language / Dil Seçin", langs, index=idx, key=widget_key)
     if sel != st.session_state.auth_lang:
         st.session_state.auth_lang = sel
+        if cookie_manager:
+            cookie_manager.set("sarsa_auth_lang", sel, expires_at=datetime.now() + timedelta(days=365))
         st.rerun()
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PAGE A — EMAIL CONFIRMED (dedicated full page, shows after signup verify)
+# PAGE A — EMAIL CONFIRMED (KAYIT SONRASI ŞIK ONAY EKRANI)
 # ══════════════════════════════════════════════════════════════════════════════
 if st.session_state.show_email_confirmed:
     st.markdown(_AUTH_CSS, unsafe_allow_html=True)
-    _lang_selector("confirmed")
+    _lang_sel("lk_confirmed")
 
     st.markdown(f"""
     <div style="text-align:center;padding:1.5rem 0 2rem;">
         <div style="font-size:5rem;line-height:1;margin-bottom:1rem;
-                    filter:drop-shadow(0 4px 16px rgba(34,197,94,0.35));">✅</div>
+                    filter:drop-shadow(0 4px 16px rgba(34,197,94,0.4));">✅</div>
         <h1 style="color:#0f172a;font-weight:800;font-size:2rem;margin:0 0 0.8rem;">
             {_at("confirmed_title","✅ Email Verified Successfully!")}
         </h1>
@@ -856,24 +851,24 @@ if st.session_state.show_email_confirmed:
     <hr style="border:none;border-top:1px solid #f1f5f9;margin:0 0 1.8rem;">
     """, unsafe_allow_html=True)
 
-    c1, c2, c3 = st.columns([1, 3, 1])
+    c1, c2, c3 = st.columns([1,3,1])
     with c2:
         if st.button(_at("confirmed_btn","🔑 Go to Login"), use_container_width=True):
             st.session_state.show_email_confirmed = False
+            with st.spinner("Yönlendiriliyor..."):
+                time.sleep(1)
             st.rerun()
 
-    st.markdown("""
-    <p style="text-align:center;color:#cbd5e1;font-size:0.8rem;margin-top:1.5rem;">
-        SarSa AI | Real Estate Intelligence
-    </p>""", unsafe_allow_html=True)
+    st.markdown("""<p style="text-align:center;color:#cbd5e1;font-size:0.8rem;margin-top:1.5rem;">
+        SarSa AI | Real Estate Intelligence</p>""", unsafe_allow_html=True)
     st.stop()
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PAGE B — SET NEW PASSWORD (shows after clicking reset-password email link)
+# PAGE B — SET NEW PASSWORD (ŞİFRE SIFIRLAMA LİNKİNDEN GELEN ŞIK EKRAN)
 # ══════════════════════════════════════════════════════════════════════════════
 if st.session_state.recovery_mode:
     st.markdown(_AUTH_CSS, unsafe_allow_html=True)
-    _lang_selector("recovery")
+    _lang_sel("lk_recovery")
 
     st.markdown(f"""
     <div style="text-align:center;padding:1rem 0 1.5rem;">
@@ -889,13 +884,13 @@ if st.session_state.recovery_mode:
     """, unsafe_allow_html=True)
 
     with st.form("recovery_form"):
-        new_pw_rec = st.text_input(
+        new_pw_val = st.text_input(
             _at("new_pw_label","New Password"),
             type="password", placeholder="••••••••"
         )
         cs, cc = st.columns(2)
         with cs: do_save   = st.form_submit_button(_at("pw_reset_btn","✅ Save Password & Login"), use_container_width=True)
-        with cc: do_cancel = st.form_submit_button(_at("pw_reset_cancel","❌ Cancel"),             use_container_width=True)
+        with cc: do_cancel = st.form_submit_button(_at("pw_reset_cancel","❌ Cancel"),              use_container_width=True)
 
         if do_cancel:
             st.session_state.recovery_mode = False
@@ -903,7 +898,7 @@ if st.session_state.recovery_mode:
             st.rerun()
 
         if do_save:
-            if len(new_pw_rec) < 6:
+            if len(new_pw_val) < 6:
                 st.error(_at("pw_reset_min_err","❌ Password must be at least 6 characters."))
             else:
                 try:
@@ -911,14 +906,15 @@ if st.session_state.recovery_mode:
                         supabase.auth.set_session(
                             st.session_state.access_token,
                             st.session_state.refresh_token)
-                    supabase.auth.update_user({"password": new_pw_rec})
+                    supabase.auth.update_user({"password": new_pw_val})
                     st.success(_at("pw_reset_success","✅ Password updated! Logging you in…"))
+                    
                     st.session_state.recovery_mode = False
                     st.session_state.is_logged_in  = True
-                    import time; time.sleep(1.5)
+                    time.sleep(1.5)
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Error: {e}")
+                    st.error(f"Error updating password: {e}")
     st.stop()
 
 # ─── AUTH STATUS ──────────────────────────────────────────────────────────────
@@ -948,16 +944,12 @@ html,body,[class*="st-"]{ font-family:'Plus Jakarta Sans',sans-serif !important;
 .stApp{ background-color:#f0f4f8 !important; }
 div[data-testid="stInputInstructions"],#MainMenu,footer,
 div[data-testid="stDecoration"]{ display:none !important; }
-span[data-testid="stIconMaterial"]{
-    font-family:"Material Symbols Rounded","Material Icons" !important; }
 .block-container{
     background:white; padding:2.5rem 3rem !important; border-radius:20px;
-    box-shadow:0 10px 40px rgba(0,0,0,0.06); margin-top:1.5rem;
-    border:1px solid #e2e8f0; }
+    box-shadow:0 10px 40px rgba(0,0,0,0.06); margin-top:1.5rem; border:1px solid #e2e8f0; }
 h1{ color:#0f172a !important; font-weight:800 !important; text-align:center; }
 [data-testid="stSidebar"]{ background:#ffffff !important; border-right:1px solid #e2e8f0 !important; }
-[data-testid="stSidebar"] label,[data-testid="stSidebar"] .stSelectbox label{
-    font-size:0.74rem !important; font-weight:700 !important;
+[data-testid="stSidebar"] label{ font-size:0.74rem !important; font-weight:700 !important;
     color:#64748b !important; text-transform:uppercase !important; letter-spacing:0.7px !important; }
 [data-testid="stSidebar"] .stTextInput input,
 [data-testid="stSidebar"] .stTextArea textarea{
@@ -968,13 +960,12 @@ h1{ color:#0f172a !important; font-weight:800 !important; text-align:center; }
     border-radius:12px !important; padding:14px 24px !important;
     font-weight:700 !important; font-size:0.95rem !important; width:100% !important;
     border:none !important; transition:all 0.25s ease !important;
-    box-shadow:0 4px 15px rgba(15,23,42,0.3) !important; letter-spacing:0.3px !important; }
+    box-shadow:0 4px 15px rgba(15,23,42,0.3) !important; }
 .stButton>button:hover{
     background:#1e293b !important;
     box-shadow:0 8px 25px rgba(15,23,42,0.4) !important; transform:translateY(-1px) !important; }
 .stTabs [aria-selected="true"]{
-    background-color:#0f172a !important; color:white !important;
-    border-radius:8px 8px 0 0 !important; }
+    background-color:#0f172a !important; color:white !important; border-radius:8px 8px 0 0 !important; }
 </style>""", unsafe_allow_html=True)
 
 @st.cache_data
@@ -985,18 +976,16 @@ def load_logo(p):
 # LOGIN / REGISTER PAGE
 # ══════════════════════════════════════════════════════════════════════════════
 if auth_status != "paid":
-    # Language selector — remembered via session state
-    all_langs = list(auth_texts.keys())
-    sel_lang  = st.selectbox(
-        "🌐 Select Language / Dil Seçin", all_langs,
-        index=all_langs.index(st.session_state.auth_lang)
-              if st.session_state.auth_lang in all_langs else 0,
-        key="login_lang_sel"
-    )
-    if sel_lang != st.session_state.auth_lang:
-        st.session_state.auth_lang = sel_lang
+    langs = list(auth_texts.keys())
+    sel   = st.selectbox(
+        "🌐 Select Language / Dil Seçin", langs,
+        index=langs.index(st.session_state.auth_lang) if st.session_state.auth_lang in langs else 0,
+        key="login_lang")
+    if sel != st.session_state.auth_lang:
+        st.session_state.auth_lang = sel
+        if cookie_manager:
+            cookie_manager.set("sarsa_auth_lang", sel, expires_at=datetime.now() + timedelta(days=365))
         st.rerun()
-
     at = auth_texts[st.session_state.auth_lang]
 
     cl, ct = st.columns([1, 6])
@@ -1004,16 +993,13 @@ if auth_status != "paid":
         logo = load_logo("SarSa_Logo_Transparent.png")
         if logo: st.image(logo, use_container_width=True)
     with ct:
-        st.markdown(
-            f"<h1 style='text-align:left;margin-top:0;padding-top:0;'>{at['welcome_title']}</h1>",
-            unsafe_allow_html=True)
-        st.markdown(
-            f"<p style='font-size:1.1rem;color:#475569;font-weight:500;margin-bottom:2rem;'>{at['welcome_desc']}</p>",
-            unsafe_allow_html=True)
+        st.markdown(f"<h1 style='text-align:left;margin-top:0;'>{at['welcome_title']}</h1>",
+                    unsafe_allow_html=True)
+        st.markdown(f"<p style='font-size:1.1rem;color:#475569;font-weight:500;margin-bottom:2rem;'>"
+                    f"{at['welcome_desc']}</p>", unsafe_allow_html=True)
 
-    st.markdown(
-        f"<h3 style='text-align:center;color:#0f172a;margin-bottom:1.5rem;'>{at['login_prompt']}</h3>",
-        unsafe_allow_html=True)
+    st.markdown(f"<h3 style='text-align:center;color:#0f172a;margin-bottom:1.5rem;'>"
+                f"{at['login_prompt']}</h3>", unsafe_allow_html=True)
 
     tab1, tab2, tab3 = st.tabs([
         f"🔑 {at['login']}", f"📝 {at['register']}", f"❓ {at['forgot_pw']}"])
@@ -1028,17 +1014,15 @@ if auth_status != "paid":
                     if r.session:
                         st.session_state.access_token  = r.session.access_token
                         st.session_state.refresh_token = r.session.refresh_token
+                        save_auth_cookies(r.session.access_token, r.session.refresh_token)
                     st.session_state.is_logged_in = True
                     st.session_state.user_email   = r.user.email
                     st.rerun()
                 except Exception as ex:
                     msg = str(ex)
-                    if "Email not confirmed" in msg:
-                        st.error(f"{at['verify_msg']} {em}")
-                    elif "Invalid login credentials" in msg:
-                        st.error(f"❌ {at['error_login']}")
-                    else:
-                        st.error(msg)
+                    if "Email not confirmed" in msg: st.error(f"{at['verify_msg']} {em}")
+                    elif "Invalid login credentials" in msg: st.error(f"❌ {at['error_login']}")
+                    else: st.error(msg)
 
     with tab2:
         with st.form("register_form"):
@@ -1053,13 +1037,11 @@ if auth_status != "paid":
                     st.success(f"✅ {at['success_reg']}")
                 except Exception as ex:
                     msg = str(ex)
-                    if "User already registered" in msg:
-                        st.error("This email is already registered. Please log in.")
-                    else:
-                        st.error(f"Error: {ex}")
+                    if "User already registered" in msg: st.error("This email is already registered.")
+                    else: st.error(f"Error: {ex}")
 
     with tab3:
-        with st.form("forgot_pw_form"):
+        with st.form("forgot_form"):
             er2 = st.text_input(at["email"], placeholder="your@email.com")
             if st.form_submit_button(at["btn_reset"]):
                 er2 = er2.strip()
@@ -1081,133 +1063,101 @@ if auth_status != "paid":
     st.stop()
 
 # ══════════════════════════════════════════════════════════════════════════════
-# AI CONFIG
+# AI + SIDEBAR (ANA UYGULAMA)
 # ══════════════════════════════════════════════════════════════════════════════
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 model = genai.GenerativeModel("gemini-2.5-flash")
 
-# ══════════════════════════════════════════════════════════════════════════════
-# SIDEBAR
-# ══════════════════════════════════════════════════════════════════════════════
 with st.sidebar:
     logo = load_logo("SarSa_Logo_Transparent.png")
-    if logo:
-        st.image(logo, use_container_width=True)
+    if logo: st.image(logo, use_container_width=True)
     else:
-        st.markdown(
-            "<div style='text-align:center;padding:0.8rem 0 0.5rem;'>"
-            "<span style='font-size:1.8rem;font-weight:800;color:#0f172a;'>SarSa</span>"
-            "<span style='font-size:1.8rem;font-weight:800;background:linear-gradient(135deg,#3b82f6,#8b5cf6);"
-            "-webkit-background-clip:text;-webkit-text-fill-color:transparent;'> AI</span></div>",
-            unsafe_allow_html=True)
-
+        st.markdown("<div style='text-align:center;padding:.8rem 0 .5rem;'>"
+                    "<span style='font-size:1.8rem;font-weight:800;color:#0f172a;'>SarSa</span>"
+                    "<span style='font-size:1.8rem;font-weight:800;background:linear-gradient(135deg,#3b82f6,#8b5cf6);"
+                    "-webkit-background-clip:text;-webkit-text-fill-color:transparent;'> AI</span></div>",
+                    unsafe_allow_html=True)
     st.divider()
 
-    # Language selector in sidebar — drives entire UI language
     all_ui  = list(ui_languages.keys())
     cur_idx = all_ui.index(st.session_state.auth_lang) if st.session_state.auth_lang in all_ui else 0
-    sel_ui  = st.selectbox(
-        f"🌐 {_ut('interface_lang','Interface Language')}",
-        all_ui, index=cur_idx, key="sidebar_lang_sel")
+    sel_ui  = st.selectbox(f"🌐 {_ut('interface_lang','Interface Language')}",
+                           all_ui, index=cur_idx, key="sb_lang")
     if sel_ui != st.session_state.auth_lang:
         st.session_state.auth_lang = sel_ui
+        if cookie_manager:
+            cookie_manager.set("sarsa_auth_lang", sel_ui, expires_at=datetime.now() + timedelta(days=365))
         st.rerun()
     t = ui_languages[st.session_state.auth_lang]
 
-    # Account Settings
     with st.expander(f"⚙️ {t['acc_settings']}"):
         st.write(st.session_state.user_email)
         st.subheader(t["update_pw"])
-        new_pw_set = st.text_input(t["new_pw"], type="password", key="settings_pw")
-        if st.button(t["btn_update"], key="btn_upd"):
-            if len(new_pw_set) < 6:
-                st.warning(t["pw_min_err"])
+        new_pw_sb = st.text_input(t["new_pw"], type="password", key="sb_pw")
+        if st.button(t["btn_update"], key="sb_upd"):
+            if len(new_pw_sb) < 6: st.warning(t["pw_min_err"])
             else:
                 try:
                     if st.session_state.access_token:
-                        supabase.auth.set_session(
-                            st.session_state.access_token, st.session_state.refresh_token)
-                    supabase.auth.update_user({"password": new_pw_set})
+                        supabase.auth.set_session(st.session_state.access_token, st.session_state.refresh_token)
+                    supabase.auth.update_user({"password": new_pw_sb})
                     st.success(t["saved_msg"])
-                except Exception as e:
-                    st.error(f"{t['error']} {e}")
-
+                except Exception as e: st.error(f"{t['error']} {e}")
         st.divider()
         st.subheader(t["danger_zone"])
-        confirm_del = st.checkbox(t["delete_confirm"])
+        chk_del = st.checkbox(t["delete_confirm"])
         if st.button(f"❌ {t['btn_delete']}", type="primary", use_container_width=True):
-            if confirm_del:
+            if chk_del:
                 try:
                     if st.session_state.access_token:
-                        supabase.auth.set_session(
-                            st.session_state.access_token, st.session_state.refresh_token)
+                        supabase.auth.set_session(st.session_state.access_token, st.session_state.refresh_token)
                     ur = supabase.auth.get_user()
                     if ur and ur.user:
-                        ct_tok = str(uuid.uuid4())
-                        ca_tok = str(uuid.uuid4())
-                        exp    = (datetime.now(timezone.utc)+timedelta(hours=24)).isoformat()
+                        ct_tok = str(uuid.uuid4()); ca_tok = str(uuid.uuid4())
+                        exp = (datetime.now(timezone.utc)+timedelta(hours=24)).isoformat()
                         supabase.table("pending_deletions").insert({
-                            "user_id": ur.user.id, "user_email": ur.user.email,
-                            "confirm_token": ct_tok, "cancel_token": ca_tok,
-                            "expires_at": exp
+                            "user_id":ur.user.id,"user_email":ur.user.email,
+                            "confirm_token":ct_tok,"cancel_token":ca_tok,"expires_at":exp
                         }).execute()
                         ok, err = send_delete_confirmation_email(ur.user.email, ct_tok, ca_tok)
                         if ok: st.success(t["delete_email_sent"])
                         else:  st.error(f"{t['delete_email_fail']} — {err}")
-                    else:
-                        st.error("Could not retrieve user. Please log out and log back in.")
-                except Exception as e:
-                    st.error(f"{t['error']} {e}")
-            else:
-                st.warning("Please tick the confirmation checkbox first.")
+                    else: st.error("Could not retrieve user. Please log out and log back in.")
+                except Exception as e: st.error(f"{t['error']} {e}")
+            else: st.warning("Please tick the confirmation checkbox first.")
 
     if st.button(f"🚪 {t['logout']}", use_container_width=True):
-        supabase.auth.sign_out()
-        for k in ["is_logged_in","user_email","access_token","refresh_token"]:
-            st.session_state[k] = False if k=="is_logged_in" else None
+        with st.spinner("Çıkış yapılıyor..."):
+            supabase.auth.sign_out()
+            for k in ["is_logged_in","user_email","access_token","refresh_token"]:
+                st.session_state[k] = False if k=="is_logged_in" else None
+            clear_auth_cookies()
+            time.sleep(1)
         st.rerun()
 
     st.markdown("---")
     st.header(t["settings"])
-
-    st.session_state.target_lang_input = st.text_input(
-        f"✍️ {t['target_lang']}", value=st.session_state.target_lang_input)
-    st.session_state.prop_type = st.text_input(
-        t["prop_type"], value=st.session_state.prop_type, placeholder=t["ph_prop"])
-    st.session_state.price     = st.text_input(
-        t["price"],     value=st.session_state.price,     placeholder=t["ph_price"])
-    st.session_state.location  = st.text_input(
-        t["location"],  value=st.session_state.location,  placeholder=t["ph_loc"])
-
+    st.session_state.target_lang_input = st.text_input(f"✍️ {t['target_lang']}", value=st.session_state.target_lang_input)
+    st.session_state.prop_type = st.text_input(t["prop_type"], value=st.session_state.prop_type, placeholder=t["ph_prop"])
+    st.session_state.price     = st.text_input(t["price"],     value=st.session_state.price,     placeholder=t["ph_price"])
+    st.session_state.location  = st.text_input(t["location"],  value=st.session_state.location,  placeholder=t["ph_loc"])
     tone_idx = t["tones"].index(st.session_state.tone) if st.session_state.tone in t["tones"] else 0
     st.session_state.tone         = st.selectbox(t["tone"], t["tones"], index=tone_idx)
-    st.session_state.audience_idx = st.selectbox(
-        t["target_audience"], range(len(t["audience_opts"])),
-        index=st.session_state.audience_idx,
-        format_func=lambda x: t["audience_opts"][x])
-
+    st.session_state.audience_idx = st.selectbox(t["target_audience"], range(len(t["audience_opts"])),
+        index=st.session_state.audience_idx, format_func=lambda x: t["audience_opts"][x])
     with st.expander(f"➕ {t['extra_details']}"):
         st.session_state.bedrooms       = st.text_input(t["bedrooms"],   value=st.session_state.bedrooms,   placeholder=t["ph_beds"])
         st.session_state.bathrooms      = st.text_input(t["bathrooms"],  value=st.session_state.bathrooms,  placeholder=t["ph_baths"])
         st.session_state.area_size      = st.text_input(t["area"],       value=st.session_state.area_size,  placeholder=t["ph_area"])
         st.session_state.year_built     = st.text_input(t["year_built"], value=st.session_state.year_built, placeholder=t["ph_year"])
-        st.session_state.furnishing_idx = st.selectbox(
-            t["furnishing"], range(len(t["furnishing_opts"])),
-            index=st.session_state.furnishing_idx,
-            format_func=lambda x: t["furnishing_opts"][x])
-
-    st.session_state.custom_inst = st.text_area(
-        f"📝 {t['custom_inst']}", value=st.session_state.custom_inst,
+        st.session_state.furnishing_idx = st.selectbox(t["furnishing"], range(len(t["furnishing_opts"])),
+            index=st.session_state.furnishing_idx, format_func=lambda x: t["furnishing_opts"][x])
+    st.session_state.custom_inst = st.text_area(f"📝 {t['custom_inst']}", value=st.session_state.custom_inst,
         placeholder=t["custom_inst_ph"], height=100)
     st.markdown("---")
-
     st.subheader(t["select_sections"])
-    sec_opts = {
-        t["tab_main"]:"main",  t["tab_social"]:"social",
-        t["tab_video"]:"video",t["tab_tech"]:"tech",
-        t["tab_email"]:"email",t["tab_seo"]:"seo",
-        t["tab_photo"]:"photo",
-    }
+    sec_opts = {t["tab_main"]:"main", t["tab_social"]:"social", t["tab_video"]:"video",
+                t["tab_tech"]:"tech", t["tab_email"]:"email", t["tab_seo"]:"seo", t["tab_photo"]:"photo"}
     st.session_state.selected_sections = st.multiselect(
         "Sections:", options=list(sec_opts.keys()),
         default=list(sec_opts.keys()), label_visibility="collapsed")
@@ -1216,22 +1166,17 @@ with st.sidebar:
 # MAIN CONTENT
 # ══════════════════════════════════════════════════════════════════════════════
 st.markdown(f"<h1 style='text-align:center;'>🏢 {t['title']}</h1>", unsafe_allow_html=True)
-st.markdown(
-    f"<p style='text-align:center;color:#64748b;font-size:1.1rem;margin-bottom:2rem;'>"
-    f"{t.get('subtitle', t['service_desc'])}</p>",
-    unsafe_allow_html=True)
+st.markdown(f"<p style='text-align:center;color:#64748b;font-size:1.1rem;margin-bottom:2rem;'>"
+            f"{t.get('subtitle',t['service_desc'])}</p>", unsafe_allow_html=True)
 
-uploaded_files = st.file_uploader(
-    f"📸 {t['upload_label']}",
-    type=["jpg","png","webp","jpeg"],
-    accept_multiple_files=True)
+uploaded_files = st.file_uploader(f"📸 {t['upload_label']}",
+    type=["jpg","png","webp","jpeg"], accept_multiple_files=True)
 
 if uploaded_files:
     imgs = [Image.open(f) for f in uploaded_files]
-    cols = st.columns(min(len(imgs), 4))
+    cols = st.columns(min(len(imgs),4))
     for i, img in enumerate(imgs):
-        with cols[i % 4]: st.image(img, use_container_width=True)
-
+        with cols[i%4]: st.image(img, use_container_width=True)
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button(f"🚀 {t.get('btn','GENERATE SELECTED ASSETS')}", use_container_width=True):
         if not st.session_state.selected_sections:
@@ -1252,6 +1197,6 @@ else:
       <h3 style='color:#475569;'>🏘️ {t.get("result","Executive Preview")}</h3>
       <p style='color:#94a3b8;'>{t["empty"]}</p>
       <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:1.4rem;">
-        {"".join(f"<span style='background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;'>{lbl}</span>" for lbl in [f"📝 {t['tab_main']}",f"📱 {t['tab_social']}",f"🎬 {t['tab_video']}",f"⚙️ {t['tab_tech']}",f"✉️ {t['tab_email']}",f"🔍 {t['tab_seo']}",f"📸 {t.get('tab_photo','Photo Guide')}"])}
+        {"".join(f"<span style='background:#f1f5f9;color:#475569;font-size:.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;'>{lb}</span>" for lb in [f"📝 {t['tab_main']}",f"📱 {t['tab_social']}",f"🎬 {t['tab_video']}",f"⚙️ {t['tab_tech']}",f"✉️ {t['tab_email']}",f"🔍 {t['tab_seo']}",f"📸 {t.get('tab_photo','Photo Guide')}"])}
       </div>
     </div>""", unsafe_allow_html=True)
