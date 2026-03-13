@@ -8,30 +8,31 @@ import uuid
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-import streamlit.components.v1 as components  # ← FIX: needed for JS hash redirect
+import streamlit.components.v1 as components
 
-# ─── PAGE CONFIG (En üstte olmalı) ────────────────────────────────────────────
+# ─── PAGE CONFIG (must be first) ──────────────────────────────────────────────
 st.set_page_config(page_title="SarSa AI | Real Estate Intelligence", page_icon="🏢", layout="wide")
 
 # ─── HASH FRAGMENT → QUERY PARAM REDIRECT ─────────────────────────────────────
-# Supabase reset-password AND signup-confirm emails use implicit flow and put
-# tokens in the URL *hash* (#access_token=...&type=recovery|signup).
-# Streamlit cannot read URL fragments server-side, so we inject a tiny JS
-# snippet that detects the fragment and immediately redirects to the same URL
-# using normal query params (?...) instead.
-# The page then reloads and Python can read the tokens via st.query_params.
+# CRITICAL FIX: components.html renders inside an iframe, so window.location
+# refers to the iframe — NOT the parent page. We must use window.parent.location
+# to read the hash and redirect the actual Streamlit app URL.
+# Supabase puts tokens in the URL hash for both recovery and signup flows.
 components.html("""
 <script>
 (function() {
-    var hash = window.location.hash;
-    if (hash && hash.length > 1) {
-        var params = new URLSearchParams(hash.substring(1));
-        var type = params.get('type');
-        var hasToken = params.get('access_token');
-        if (hasToken || type === 'recovery' || type === 'signup') {
-            window.location.replace(window.location.pathname + '?' + params.toString());
+    try {
+        var hash = window.parent.location.hash;
+        if (hash && hash.length > 1) {
+            var params = new URLSearchParams(hash.substring(1));
+            var type = params.get('type');
+            var hasToken = params.get('access_token');
+            if (hasToken || type === 'recovery' || type === 'signup') {
+                var newUrl = window.parent.location.pathname + '?' + params.toString();
+                window.parent.location.replace(newUrl);
+            }
         }
-    }
+    } catch(e) {}
 })();
 </script>
 """, height=0)
@@ -42,14 +43,13 @@ SUPABASE_KEY: str = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ─── SESSION STATE INITIALIZATION ─────────────────────────────────────────────
-if 'auth_lang' not in st.session_state: st.session_state.auth_lang = "English"
-if 'is_logged_in' not in st.session_state: st.session_state.is_logged_in = False
-if 'user_email' not in st.session_state: st.session_state.user_email = None
-if 'recovery_mode' not in st.session_state: st.session_state.recovery_mode = False
-if 'access_token' not in st.session_state: st.session_state.access_token = None
-if 'refresh_token' not in st.session_state: st.session_state.refresh_token = None
-# ← NEW: flag shown after email verification link is clicked
-if 'email_verified' not in st.session_state: st.session_state.email_verified = False
+if 'auth_lang'       not in st.session_state: st.session_state.auth_lang       = "English"
+if 'is_logged_in'    not in st.session_state: st.session_state.is_logged_in    = False
+if 'user_email'      not in st.session_state: st.session_state.user_email      = None
+if 'recovery_mode'   not in st.session_state: st.session_state.recovery_mode   = False
+if 'access_token'    not in st.session_state: st.session_state.access_token    = None
+if 'refresh_token'   not in st.session_state: st.session_state.refresh_token   = None
+if 'email_verified'  not in st.session_state: st.session_state.email_verified  = False
 
 for key_name, val in [
     ("uretilen_ilan", ""), ("prop_type", ""), ("price", ""),
@@ -61,75 +61,78 @@ for key_name, val in [
     if key_name not in st.session_state:
         st.session_state[key_name] = val
 
-# ─── PERSISTENT SESSION RESTORE (prevents logout on page refresh) ─────────────
+# ─── PERSISTENT SESSION RESTORE ───────────────────────────────────────────────
 if st.session_state.access_token and not st.session_state.is_logged_in:
     try:
         supabase.auth.set_session(st.session_state.access_token, st.session_state.refresh_token)
         _check = supabase.auth.get_user()
         if _check and _check.user:
             st.session_state.is_logged_in = True
-            st.session_state.user_email = _check.user.email
+            st.session_state.user_email   = _check.user.email
     except Exception:
-        st.session_state.access_token = None
+        st.session_state.access_token  = None
         st.session_state.refresh_token = None
-        st.session_state.is_logged_in = False
+        st.session_state.is_logged_in  = False
 
 # ─── EMAIL HELPER — Delete Confirmation ───────────────────────────────────────
 def send_delete_confirmation_email(to_email: str, confirm_token: str, cancel_token: str):
-    """Returns (True, '') on success or (False, error_message) on failure."""
-    app_url = "https://sarsa-ai-estateintelligence.streamlit.app/"
+    app_url     = "https://sarsa-ai-estateintelligence.streamlit.app/"
     confirm_url = f"{app_url}?action=confirm_delete&token={confirm_token}"
     cancel_url  = f"{app_url}?action=cancel_delete&token={cancel_token}"
-
     html_body = f"""
-    <div style="font-family: 'Arial', sans-serif; max-width: 620px; margin: 0 auto; padding: 30px; background: #f8fafc; border-radius: 16px;">
-      <div style="background: white; border-radius: 12px; padding: 36px; box-shadow: 0 4px 20px rgba(0,0,0,0.07);">
-        <div style="text-align:center; margin-bottom: 28px;">
-          <h2 style="color: #0f172a; font-size: 22px; margin: 0;">Warning Account Deletion Request</h2>
-          <p style="color: #64748b; margin-top: 8px; font-size: 14px;">SarSa AI | Real Estate Intelligence</p>
+    <div style="font-family:'Arial',sans-serif;max-width:620px;margin:0 auto;padding:30px;background:#f8fafc;border-radius:16px;">
+      <div style="background:white;border-radius:12px;padding:36px;box-shadow:0 4px 20px rgba(0,0,0,0.07);">
+        <div style="text-align:center;margin-bottom:28px;">
+          <h2 style="color:#0f172a;font-size:22px;margin:0;">⚠️ Account Deletion Request</h2>
+          <p style="color:#64748b;margin-top:8px;font-size:14px;">SarSa AI | Real Estate Intelligence</p>
         </div>
-        <p style="color: #334155; font-size: 16px; line-height: 1.6;">
+        <p style="color:#334155;font-size:16px;line-height:1.6;">
           We received a request to <strong>permanently delete</strong> the SarSa AI account associated with:<br>
           <strong style="color:#0f172a;">{to_email}</strong>
         </p>
-        <p style="color: #ef4444; font-size: 15px; font-weight: 600;">This action is irreversible. All your data will be permanently removed.</p>
-        <div style="text-align: center; margin: 32px 0;">
-          <a href="{confirm_url}"
-             style="background-color: #dc2626; color: white; padding: 14px 32px; border-radius: 10px;
-                    text-decoration: none; font-weight: 700; font-size: 16px; display: inline-block; margin-bottom: 14px;">
+        <p style="color:#ef4444;font-size:15px;font-weight:600;">This action is irreversible. All your data will be permanently removed.</p>
+        <div style="text-align:center;margin:32px 0;">
+          <a href="{confirm_url}" style="background-color:#dc2626;color:white;padding:14px 32px;border-radius:10px;text-decoration:none;font-weight:700;font-size:16px;display:inline-block;margin-bottom:14px;">
             Yes, Delete My Account
           </a><br>
-          <a href="{cancel_url}"
-             style="background-color: #0f172a; color: white; padding: 14px 32px; border-radius: 10px;
-                    text-decoration: none; font-weight: 700; font-size: 16px; display: inline-block;">
+          <a href="{cancel_url}" style="background-color:#0f172a;color:white;padding:14px 32px;border-radius:10px;text-decoration:none;font-weight:700;font-size:16px;display:inline-block;">
             Cancel - Keep My Account Safe
           </a>
         </div>
-        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;">
-        <p style="color: #94a3b8; font-size: 13px; text-align: center;">
+        <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;">
+        <p style="color:#94a3b8;font-size:13px;text-align:center;">
           This link expires in <strong>24 hours</strong>.<br>
-          If you did not request this, simply ignore this email - your account is completely safe.
+          If you did not request this, simply ignore this email.
         </p>
       </div>
-    </div>
-    """
+    </div>"""
     try:
         msg = MIMEMultipart("alternative")
         msg["Subject"] = "SarSa AI - Confirm Account Deletion"
         msg["From"]    = st.secrets["SMTP_USER"]
         msg["To"]      = to_email
         msg.attach(MIMEText(html_body, "html"))
-
         smtp_host = st.secrets.get("SMTP_HOST", "smtp.gmail.com")
         smtp_port = int(st.secrets.get("SMTP_PORT", 587))
         with smtplib.SMTP(smtp_host, smtp_port) as server:
-            server.ehlo()
-            server.starttls()
+            server.ehlo(); server.starttls()
             server.login(st.secrets["SMTP_USER"], st.secrets["SMTP_PASS"])
             server.sendmail(st.secrets["SMTP_USER"], to_email, msg.as_string())
         return True, ""
     except Exception as smtp_err:
         return False, str(smtp_err)
+
+# ─── HELPER: Check if email is registered ─────────────────────────────────────
+def is_email_registered(email: str) -> bool:
+    """Uses service key admin API to check if an email is already registered."""
+    try:
+        svc = create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_SERVICE_KEY"])
+        users_resp = svc.auth.admin.list_users()
+        registered = [u.email.lower() for u in users_resp if u.email]
+        return email.lower().strip() in registered
+    except Exception:
+        # If we can't check (e.g. no service key), allow sending to avoid blocking
+        return True
 
 # ─── QUERY PARAM HANDLERS ─────────────────────────────────────────────────────
 query_params = st.query_params
@@ -140,34 +143,30 @@ if "action" in query_params and query_params.get("action") == "confirm_delete":
     try:
         result = supabase.table("pending_deletions").select("*").eq("confirm_token", token).execute()
         if result.data:
-            record = result.data[0]
-            expires_str = record.get("expires_at", "")
-            expires_at  = datetime.fromisoformat(expires_str.replace("Z", "+00:00"))
-            now_utc     = datetime.now(timezone.utc)
-            if now_utc < expires_at:
+            record     = result.data[0]
+            expires_at = datetime.fromisoformat(record.get("expires_at","").replace("Z","+00:00"))
+            if datetime.now(timezone.utc) < expires_at:
                 try:
                     svc = create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_SERVICE_KEY"])
                     svc.auth.admin.delete_user(record["user_id"])
                 except Exception as del_e:
-                    st.error(f"Deletion error: {del_e}")
-                    st.stop()
+                    st.error(f"Deletion error: {del_e}"); st.stop()
                 supabase.table("pending_deletions").delete().eq("confirm_token", token).execute()
-                for _k in ["is_logged_in", "user_email", "access_token", "refresh_token"]:
+                for _k in ["is_logged_in","user_email","access_token","refresh_token"]:
                     st.session_state[_k] = None if _k != "is_logged_in" else False
                 st.query_params.clear()
                 st.markdown("""
-                <div style='text-align:center; padding:5rem 2rem;'>
-                  <div style='font-size:5rem; margin-bottom:1rem;'>👋</div>
-                  <h1 style='color:#0f172a; font-weight:800;'>Account Deleted</h1>
-                  <p style='color:#475569; font-size:1.15rem; margin-top:1rem; line-height:1.7;'>
+                <div style='text-align:center;padding:5rem 2rem;'>
+                  <div style='font-size:5rem;margin-bottom:1rem;'>👋</div>
+                  <h1 style='color:#0f172a;font-weight:800;'>Account Deleted</h1>
+                  <p style='color:#475569;font-size:1.15rem;margin-top:1rem;line-height:1.7;'>
                     Your SarSa AI account has been <strong>permanently deleted</strong>.<br>
                     All your data has been removed from our systems.
                   </p>
-                  <p style='color:#94a3b8; margin-top:2rem; font-size:0.95rem;'>You have been logged out.</p>
-                  <hr style='border:none; border-top:1px solid #e2e8f0; margin:2.5rem auto; max-width:400px;'>
-                  <p style='color:#cbd5e1; font-size:0.85rem;'>Thank you for using SarSa AI.</p>
-                </div>
-                """, unsafe_allow_html=True)
+                  <p style='color:#94a3b8;margin-top:2rem;font-size:0.95rem;'>You have been logged out.</p>
+                  <hr style='border:none;border-top:1px solid #e2e8f0;margin:2.5rem auto;max-width:400px;'>
+                  <p style='color:#cbd5e1;font-size:0.85rem;'>Thank you for using SarSa AI.</p>
+                </div>""", unsafe_allow_html=True)
                 st.stop()
             else:
                 st.error("This confirmation link has expired (24h limit). Please request a new deletion from Account Settings.")
@@ -189,214 +188,232 @@ if "action" in query_params and query_params.get("action") == "cancel_delete":
     import time; time.sleep(2)
     st.rerun()
 
-# ─── TEXT DICTIONARIES (9 LANGUAGES - FULL) ───────────────────────────────────
+# ─── TEXT DICTIONARIES (9 LANGUAGES) ──────────────────────────────────────────
 auth_texts = {
     "English": {
-        "access": "SarSa AI Access", "login": "Login", "register": "Register",
-        "email": "Email", "password": "Password", "btn_login": "Login",
-        "btn_reg": "Create Account",
-        "success_reg": "Registration successful! Check your email to verify your account.",
-        "error_login": "Login failed. You are not registered, or your Email/Password is incorrect.",
-        "verify_msg": "Please verify your email:", "btn_check": "I verified, let me in",
-        "unpaid_msg": "Subscription required.", "upgrade_title": "Professional Plan",
-        "pay_btn": "Subscribe Now", "welcome_title": "Welcome to SarSa AI",
-        "welcome_desc": "The All-in-One Visual Property Intelligence & Global Sales Automation platform. Transform your property photos into professional assets in seconds.",
-        "login_prompt": "Log in to use the application",
-        "forgot_pw": "Forgot Password?", "btn_reset": "Send Reset Link",
-        "reset_success": "Reset link sent to your email.",
-        # ← NEW
-        "email_verified_title": "✅ Email Verified Successfully!",
-        "email_verified_msg": "Your account has been confirmed. Please log in below to get started.",
-        "pw_reset_title": "🔒 Set Your New Password",
-        "pw_reset_desc": "Enter a new password for your account. You will be logged in automatically after saving.",
-        "pw_reset_btn": "Set Password & Login",
-        "pw_reset_cancel": "Cancel",
-        "pw_reset_success": "✅ Password updated successfully! Logging you in...",
-        "pw_reset_min_err": "❌ Password must be at least 6 characters!",
+        "access":"SarSa AI Access","login":"Login","register":"Register",
+        "email":"Email","password":"Password","btn_login":"Login",
+        "btn_reg":"Create Account",
+        "success_reg":"Registration successful! Check your email to verify your account.",
+        "error_login":"Login failed. You are not registered, or your Email/Password is incorrect.",
+        "verify_msg":"Please verify your email:","btn_check":"I verified, let me in",
+        "unpaid_msg":"Subscription required.","upgrade_title":"Professional Plan",
+        "pay_btn":"Subscribe Now","welcome_title":"Welcome to SarSa AI",
+        "welcome_desc":"The All-in-One Visual Property Intelligence & Global Sales Automation platform. Transform your property photos into professional assets in seconds.",
+        "login_prompt":"Log in to use the application",
+        "forgot_pw":"Forgot Password?","btn_reset":"Send Reset Link",
+        "reset_success":"Password reset link sent! Check your inbox.",
+        "reset_not_found":"No account found with this email address. Please register first.",
+        "reset_invalid_email":"Please enter a valid email address.",
+        "email_verified_title":"✅ Email Verified Successfully!",
+        "email_verified_msg":"Your account has been confirmed. Please log in below to get started.",
+        "pw_reset_title":"Set Your New Password",
+        "pw_reset_desc":"Enter a new password for your account. You will be logged in automatically after saving.",
+        "pw_reset_btn":"✅ Set Password & Login",
+        "pw_reset_cancel":"❌ Cancel",
+        "pw_reset_success":"✅ Password updated successfully! Logging you in...",
+        "pw_reset_min_err":"❌ Password must be at least 6 characters!",
+        "new_pw_label":"New Password",
     },
     "Türkçe": {
-        "access": "SarSa AI Erişimi", "login": "Giriş Yap", "register": "Kayıt Ol",
-        "email": "E-posta", "password": "Şifre", "btn_login": "Oturum Aç",
-        "btn_reg": "Hesap Oluştur",
-        "success_reg": "Kayıt başarılı! Hesabınızı onaylamak için e-postanızı kontrol edin.",
-        "error_login": "Giriş başarısız. Kayıtlı değilsiniz veya E-posta/Şifreniz hatalı.",
-        "verify_msg": "Lütfen e-postanızı onaylayın:", "btn_check": "Onayladım, içeri al",
-        "unpaid_msg": "Abonelik gerekiyor.", "upgrade_title": "Profesyonel Paket",
-        "pay_btn": "Şimdi Abone Ol", "welcome_title": "SarSa AI'a Hoş Geldiniz",
-        "welcome_desc": "Hepsi Bir Arada Görsel Mülk Zekâsı ve Küresel Satış Otomasyonu platformu. Mülk fotoğraflarınızı saniyeler içinde profesyonel varlıklara dönüştürün.",
-        "login_prompt": "Uygulamayı kullanmak için giriş yapın",
-        "forgot_pw": "Şifremi Unuttum?", "btn_reset": "Sıfırlama Bağlantısı Gönder",
-        "reset_success": "Sıfırlama bağlantısı e-postanıza gönderildi.",
-        # ← NEW
-        "email_verified_title": "✅ E-posta Başarıyla Doğrulandı!",
-        "email_verified_msg": "Hesabınız onaylandı. Devam etmek için aşağıdan giriş yapın.",
-        "pw_reset_title": "🔒 Yeni Şifrenizi Belirleyin",
-        "pw_reset_desc": "Hesabınız için yeni bir şifre girin. Kaydettikten sonra otomatik olarak giriş yapılacaksınız.",
-        "pw_reset_btn": "Şifreyi Kaydet ve Giriş Yap",
-        "pw_reset_cancel": "İptal",
-        "pw_reset_success": "✅ Şifre başarıyla güncellendi! Giriş yapılıyor...",
-        "pw_reset_min_err": "❌ Şifre en az 6 karakter olmalıdır!",
+        "access":"SarSa AI Erişimi","login":"Giriş Yap","register":"Kayıt Ol",
+        "email":"E-posta","password":"Şifre","btn_login":"Oturum Aç",
+        "btn_reg":"Hesap Oluştur",
+        "success_reg":"Kayıt başarılı! Hesabınızı onaylamak için e-postanızı kontrol edin.",
+        "error_login":"Giriş başarısız. Kayıtlı değilsiniz veya E-posta/Şifreniz hatalı.",
+        "verify_msg":"Lütfen e-postanızı onaylayın:","btn_check":"Onayladım, içeri al",
+        "unpaid_msg":"Abonelik gerekiyor.","upgrade_title":"Profesyonel Paket",
+        "pay_btn":"Şimdi Abone Ol","welcome_title":"SarSa AI'a Hoş Geldiniz",
+        "welcome_desc":"Hepsi Bir Arada Görsel Mülk Zekâsı ve Küresel Satış Otomasyonu platformu. Mülk fotoğraflarınızı saniyeler içinde profesyonel varlıklara dönüştürün.",
+        "login_prompt":"Uygulamayı kullanmak için giriş yapın",
+        "forgot_pw":"Şifremi Unuttum?","btn_reset":"Sıfırlama Bağlantısı Gönder",
+        "reset_success":"Şifre sıfırlama bağlantısı gönderildi! Gelen kutunuzu kontrol edin.",
+        "reset_not_found":"Bu e-posta adresiyle kayıtlı hesap bulunamadı. Lütfen önce kayıt olun.",
+        "reset_invalid_email":"Lütfen geçerli bir e-posta adresi girin.",
+        "email_verified_title":"✅ E-posta Başarıyla Doğrulandı!",
+        "email_verified_msg":"Hesabınız onaylandı. Devam etmek için aşağıdan giriş yapın.",
+        "pw_reset_title":"Yeni Şifrenizi Belirleyin",
+        "pw_reset_desc":"Hesabınız için yeni bir şifre girin. Kaydettikten sonra otomatik olarak giriş yapılacaksınız.",
+        "pw_reset_btn":"✅ Şifreyi Kaydet ve Giriş Yap",
+        "pw_reset_cancel":"❌ İptal",
+        "pw_reset_success":"✅ Şifre başarıyla güncellendi! Giriş yapılıyor...",
+        "pw_reset_min_err":"❌ Şifre en az 6 karakter olmalıdır!",
+        "new_pw_label":"Yeni Şifre",
     },
     "Español": {
-        "access": "Acceso a SarSa AI", "login": "Iniciar Sesión", "register": "Registrarse",
-        "email": "Correo", "password": "Clave", "btn_login": "Entrar",
-        "btn_reg": "Crear Cuenta",
-        "success_reg": "Registro exitoso! Revisa tu email para verificar tu cuenta.",
-        "error_login": "Error. No estás registrado o tu Correo/Clave es incorrecto.",
-        "verify_msg": "Verifica tu email:", "btn_check": "Ya verifiqué, entrar",
-        "unpaid_msg": "Suscripción necesaria.", "upgrade_title": "Plan Profesional",
-        "pay_btn": "Suscribirse Ahora", "welcome_title": "Bienvenido a SarSa AI",
-        "welcome_desc": "La plataforma todo en uno de Inteligencia Visual de Propiedades y Automatización de Ventas. Transforme sus fotos en activos profesionales en segundos.",
-        "login_prompt": "Inicie sesión para usar la aplicación",
-        "forgot_pw": "Olvidaste tu contraseña?", "btn_reset": "Enviar enlace",
-        "reset_success": "Enlace de restablecimiento enviado.",
-        # ← NEW
-        "email_verified_title": "✅ ¡Email Verificado Exitosamente!",
-        "email_verified_msg": "Tu cuenta ha sido confirmada. Por favor inicia sesión abajo.",
-        "pw_reset_title": "🔒 Establece tu Nueva Contraseña",
-        "pw_reset_desc": "Ingresa una nueva contraseña para tu cuenta. Iniciarás sesión automáticamente al guardar.",
-        "pw_reset_btn": "Guardar Contraseña e Iniciar Sesión",
-        "pw_reset_cancel": "Cancelar",
-        "pw_reset_success": "✅ ¡Contraseña actualizada! Iniciando sesión...",
-        "pw_reset_min_err": "❌ Mínimo 6 caracteres requeridos.",
+        "access":"Acceso a SarSa AI","login":"Iniciar Sesión","register":"Registrarse",
+        "email":"Correo","password":"Clave","btn_login":"Entrar",
+        "btn_reg":"Crear Cuenta",
+        "success_reg":"Registro exitoso! Revisa tu email para verificar tu cuenta.",
+        "error_login":"Error. No estás registrado o tu Correo/Clave es incorrecto.",
+        "verify_msg":"Verifica tu email:","btn_check":"Ya verifiqué, entrar",
+        "unpaid_msg":"Suscripción necesaria.","upgrade_title":"Plan Profesional",
+        "pay_btn":"Suscribirse Ahora","welcome_title":"Bienvenido a SarSa AI",
+        "welcome_desc":"La plataforma todo en uno de Inteligencia Visual de Propiedades y Automatización de Ventas. Transforme sus fotos en activos profesionales en segundos.",
+        "login_prompt":"Inicie sesión para usar la aplicación",
+        "forgot_pw":"Olvidaste tu contraseña?","btn_reset":"Enviar enlace",
+        "reset_success":"¡Enlace de restablecimiento enviado! Revisa tu bandeja.",
+        "reset_not_found":"No se encontró ninguna cuenta con este correo. Por favor regístrate primero.",
+        "reset_invalid_email":"Por favor ingresa un correo válido.",
+        "email_verified_title":"✅ ¡Email Verificado Exitosamente!",
+        "email_verified_msg":"Tu cuenta ha sido confirmada. Por favor inicia sesión abajo.",
+        "pw_reset_title":"Establece tu Nueva Contraseña",
+        "pw_reset_desc":"Ingresa una nueva contraseña. Iniciarás sesión automáticamente al guardar.",
+        "pw_reset_btn":"✅ Guardar Contraseña e Iniciar Sesión",
+        "pw_reset_cancel":"❌ Cancelar",
+        "pw_reset_success":"✅ ¡Contraseña actualizada! Iniciando sesión...",
+        "pw_reset_min_err":"❌ Mínimo 6 caracteres requeridos.",
+        "new_pw_label":"Nueva Contraseña",
     },
     "Deutsch": {
-        "access": "SarSa AI Zugang", "login": "Anmelden", "register": "Registrieren",
-        "email": "E-Mail", "password": "Passwort", "btn_login": "Login",
-        "btn_reg": "Konto Erstellen",
-        "success_reg": "Erfolgreich! Bitte bestätigen Sie Ihre E-Mail.",
-        "error_login": "Login fehlgeschlagen. Nicht registriert oder E-Mail/Passwort falsch.",
-        "verify_msg": "E-Mail bestätigen:", "btn_check": "Bestätigt, einloggen",
-        "unpaid_msg": "Abo erforderlich.", "upgrade_title": "Profi-Paket",
-        "pay_btn": "Jetzt Abonnieren", "welcome_title": "Willkommen bei SarSa AI",
-        "welcome_desc": "Die All-in-One-Plattform für visuelle Immobilienintelligenz. Verwandeln Sie Ihre Immobilienfotos in Sekundenschnelle in professionelle Assets.",
-        "login_prompt": "Melden Sie sich an, um die App zu nutzen",
-        "forgot_pw": "Passwort vergessen?", "btn_reset": "Link senden",
-        "reset_success": "Link an E-Mail gesendet.",
-        # ← NEW
-        "email_verified_title": "✅ E-Mail erfolgreich verifiziert!",
-        "email_verified_msg": "Ihr Konto wurde bestätigt. Bitte melden Sie sich unten an.",
-        "pw_reset_title": "🔒 Neues Passwort festlegen",
-        "pw_reset_desc": "Geben Sie ein neues Passwort für Ihr Konto ein. Sie werden nach dem Speichern automatisch eingeloggt.",
-        "pw_reset_btn": "Passwort speichern & einloggen",
-        "pw_reset_cancel": "Abbrechen",
-        "pw_reset_success": "✅ Passwort aktualisiert! Einloggen...",
-        "pw_reset_min_err": "❌ Mindestens 6 Zeichen erforderlich.",
+        "access":"SarSa AI Zugang","login":"Anmelden","register":"Registrieren",
+        "email":"E-Mail","password":"Passwort","btn_login":"Login",
+        "btn_reg":"Konto Erstellen",
+        "success_reg":"Erfolgreich! Bitte bestätigen Sie Ihre E-Mail.",
+        "error_login":"Login fehlgeschlagen. Nicht registriert oder E-Mail/Passwort falsch.",
+        "verify_msg":"E-Mail bestätigen:","btn_check":"Bestätigt, einloggen",
+        "unpaid_msg":"Abo erforderlich.","upgrade_title":"Profi-Paket",
+        "pay_btn":"Jetzt Abonnieren","welcome_title":"Willkommen bei SarSa AI",
+        "welcome_desc":"Die All-in-One-Plattform für visuelle Immobilienintelligenz. Verwandeln Sie Ihre Immobilienfotos in Sekundenschnelle in professionelle Assets.",
+        "login_prompt":"Melden Sie sich an, um die App zu nutzen",
+        "forgot_pw":"Passwort vergessen?","btn_reset":"Link senden",
+        "reset_success":"Link gesendet! Überprüfen Sie Ihren Posteingang.",
+        "reset_not_found":"Kein Konto mit dieser E-Mail gefunden. Bitte zuerst registrieren.",
+        "reset_invalid_email":"Bitte gültige E-Mail-Adresse eingeben.",
+        "email_verified_title":"✅ E-Mail erfolgreich verifiziert!",
+        "email_verified_msg":"Ihr Konto wurde bestätigt. Bitte melden Sie sich unten an.",
+        "pw_reset_title":"Neues Passwort festlegen",
+        "pw_reset_desc":"Geben Sie ein neues Passwort ein. Sie werden automatisch eingeloggt.",
+        "pw_reset_btn":"✅ Passwort speichern & einloggen",
+        "pw_reset_cancel":"❌ Abbrechen",
+        "pw_reset_success":"✅ Passwort aktualisiert! Einloggen...",
+        "pw_reset_min_err":"❌ Mindestens 6 Zeichen erforderlich.",
+        "new_pw_label":"Neues Passwort",
     },
     "Français": {
-        "access": "Accès SarSa AI", "login": "Connexion", "register": "S'inscrire",
-        "email": "Email", "password": "Mot de passe", "btn_login": "Se connecter",
-        "btn_reg": "Créer un compte",
-        "success_reg": "Succes! Vérifiez vos emails pour confirmer.",
-        "error_login": "Echec. Vous n'êtes pas inscrit ou Email/Mot de passe incorrect.",
-        "verify_msg": "Vérifiez votre email:", "btn_check": "Vérifié, entrer",
-        "unpaid_msg": "Abonnement requis.", "upgrade_title": "Pack Professionnel",
-        "pay_btn": "S'abonner Maintenant", "welcome_title": "Bienvenue sur SarSa AI",
-        "welcome_desc": "La plateforme d'Intelligence Visuelle Immobilière et d'Automatisation des Ventes. Transformez vos photos en atouts professionnels en quelques secondes.",
-        "login_prompt": "Connectez-vous pour utiliser l'application",
-        "forgot_pw": "Mot de passe oublié?", "btn_reset": "Envoyer le lien",
-        "reset_success": "Lien envoyé par e-mail.",
-        # ← NEW
-        "email_verified_title": "✅ Email vérifié avec succès !",
-        "email_verified_msg": "Votre compte a été confirmé. Veuillez vous connecter ci-dessous.",
-        "pw_reset_title": "🔒 Définissez votre nouveau mot de passe",
-        "pw_reset_desc": "Entrez un nouveau mot de passe pour votre compte. Vous serez connecté automatiquement après l'enregistrement.",
-        "pw_reset_btn": "Enregistrer & Se connecter",
-        "pw_reset_cancel": "Annuler",
-        "pw_reset_success": "✅ Mot de passe mis à jour ! Connexion en cours...",
-        "pw_reset_min_err": "❌ 6 caractères minimum.",
+        "access":"Accès SarSa AI","login":"Connexion","register":"S'inscrire",
+        "email":"Email","password":"Mot de passe","btn_login":"Se connecter",
+        "btn_reg":"Créer un compte",
+        "success_reg":"Succes! Vérifiez vos emails pour confirmer.",
+        "error_login":"Echec. Vous n'êtes pas inscrit ou Email/Mot de passe incorrect.",
+        "verify_msg":"Vérifiez votre email:","btn_check":"Vérifié, entrer",
+        "unpaid_msg":"Abonnement requis.","upgrade_title":"Pack Professionnel",
+        "pay_btn":"S'abonner Maintenant","welcome_title":"Bienvenue sur SarSa AI",
+        "welcome_desc":"La plateforme d'Intelligence Visuelle Immobilière et d'Automatisation des Ventes. Transformez vos photos en atouts professionnels en quelques secondes.",
+        "login_prompt":"Connectez-vous pour utiliser l'application",
+        "forgot_pw":"Mot de passe oublié?","btn_reset":"Envoyer le lien",
+        "reset_success":"Lien envoyé ! Vérifiez votre boîte de réception.",
+        "reset_not_found":"Aucun compte trouvé avec cet email. Veuillez d'abord vous inscrire.",
+        "reset_invalid_email":"Veuillez entrer une adresse email valide.",
+        "email_verified_title":"✅ Email vérifié avec succès !",
+        "email_verified_msg":"Votre compte a été confirmé. Veuillez vous connecter ci-dessous.",
+        "pw_reset_title":"Définissez votre nouveau mot de passe",
+        "pw_reset_desc":"Entrez un nouveau mot de passe. Vous serez connecté automatiquement après.",
+        "pw_reset_btn":"✅ Enregistrer & Se connecter",
+        "pw_reset_cancel":"❌ Annuler",
+        "pw_reset_success":"✅ Mot de passe mis à jour ! Connexion en cours...",
+        "pw_reset_min_err":"❌ 6 caractères minimum.",
+        "new_pw_label":"Nouveau mot de passe",
     },
     "Português": {
-        "access": "Acesso SarSa AI", "login": "Entrar", "register": "Registar",
-        "email": "Email", "password": "Senha", "btn_login": "Login",
-        "btn_reg": "Criar Conta",
-        "success_reg": "Sucesso! Verifique seu email para confirmar a conta.",
-        "error_login": "Falha. Não registado ou Email/Senha incorretos.",
-        "verify_msg": "Verifique seu email:", "btn_check": "Verificado, entrar",
-        "unpaid_msg": "Assinatura necessária.", "upgrade_title": "Plano Profissional",
-        "pay_btn": "Assinar Agora", "welcome_title": "Bem-vindo ao SarSa AI",
-        "welcome_desc": "A plataforma tudo-em-um de Inteligência Imobiliária Visual e Automação de Vendas. Transforme as suas fotos em ativos profissionais em segundos.",
-        "login_prompt": "Faça login para usar o aplicativo",
-        "forgot_pw": "Esqueceu a senha?", "btn_reset": "Enviar link",
-        "reset_success": "Link enviado para seu e-mail.",
-        # ← NEW
-        "email_verified_title": "✅ Email Verificado com Sucesso!",
-        "email_verified_msg": "Sua conta foi confirmada. Por favor faça login abaixo.",
-        "pw_reset_title": "🔒 Defina sua Nova Senha",
-        "pw_reset_desc": "Insira uma nova senha para sua conta. Você será logado automaticamente após salvar.",
-        "pw_reset_btn": "Salvar Senha & Entrar",
-        "pw_reset_cancel": "Cancelar",
-        "pw_reset_success": "✅ Senha atualizada! Entrando...",
-        "pw_reset_min_err": "❌ Mínimo de 6 caracteres.",
+        "access":"Acesso SarSa AI","login":"Entrar","register":"Registar",
+        "email":"Email","password":"Senha","btn_login":"Login",
+        "btn_reg":"Criar Conta",
+        "success_reg":"Sucesso! Verifique seu email para confirmar a conta.",
+        "error_login":"Falha. Não registado ou Email/Senha incorretos.",
+        "verify_msg":"Verifique seu email:","btn_check":"Verificado, entrar",
+        "unpaid_msg":"Assinatura necessária.","upgrade_title":"Plano Profissional",
+        "pay_btn":"Assinar Agora","welcome_title":"Bem-vindo ao SarSa AI",
+        "welcome_desc":"A plataforma tudo-em-um de Inteligência Imobiliária Visual e Automação de Vendas. Transforme as suas fotos em ativos profissionais em segundos.",
+        "login_prompt":"Faça login para usar o aplicativo",
+        "forgot_pw":"Esqueceu a senha?","btn_reset":"Enviar link",
+        "reset_success":"Link enviado! Verifique sua caixa de entrada.",
+        "reset_not_found":"Nenhuma conta encontrada com este email. Por favor registe-se primeiro.",
+        "reset_invalid_email":"Por favor insira um endereço de email válido.",
+        "email_verified_title":"✅ Email Verificado com Sucesso!",
+        "email_verified_msg":"Sua conta foi confirmada. Por favor faça login abaixo.",
+        "pw_reset_title":"Defina sua Nova Senha",
+        "pw_reset_desc":"Insira uma nova senha. Você será logado automaticamente após salvar.",
+        "pw_reset_btn":"✅ Salvar Senha & Entrar",
+        "pw_reset_cancel":"❌ Cancelar",
+        "pw_reset_success":"✅ Senha atualizada! Entrando...",
+        "pw_reset_min_err":"❌ Mínimo de 6 caracteres.",
+        "new_pw_label":"Nova Senha",
     },
     "日本語": {
-        "access": "SarSa AI アクセス", "login": "ログイン", "register": "新規登録",
-        "email": "メール", "password": "パスワード", "btn_login": "ログイン",
-        "btn_reg": "アカウント作成",
-        "success_reg": "登録完了！メールを確認してアカウントを認証してください。",
-        "error_login": "ログイン失敗。未登録か、メール/パスワードが間違っています。",
-        "verify_msg": "メールを認証してください:", "btn_check": "認証済み、入る",
-        "unpaid_msg": "サブスクリプションが必要です。", "upgrade_title": "プロフェッショナルプラン",
-        "pay_btn": "今すぐ購読", "welcome_title": "SarSa AI へようこそ",
-        "welcome_desc": "オールインワンの視覚的物件インテリジェンス＆販売自動化プラットフォーム。物件の写真を数秒でプロフェッショナルな資産に変換します。",
-        "login_prompt": "アプリを使用するにはログインしてください",
-        "forgot_pw": "パスワードをお忘れですか？", "btn_reset": "リンクを送信",
-        "reset_success": "リセットリンクが送信されました。",
-        # ← NEW
-        "email_verified_title": "✅ メールが正常に認証されました！",
-        "email_verified_msg": "アカウントが確認されました。下記からログインしてください。",
-        "pw_reset_title": "🔒 新しいパスワードを設定",
-        "pw_reset_desc": "新しいパスワードを入力してください。保存後に自動的にログインされます。",
-        "pw_reset_btn": "パスワードを保存してログイン",
-        "pw_reset_cancel": "キャンセル",
-        "pw_reset_success": "✅ パスワードが更新されました！ログイン中...",
-        "pw_reset_min_err": "❌ 6文字以上必要です。",
+        "access":"SarSa AI アクセス","login":"ログイン","register":"新規登録",
+        "email":"メール","password":"パスワード","btn_login":"ログイン",
+        "btn_reg":"アカウント作成",
+        "success_reg":"登録完了！メールを確認してアカウントを認証してください。",
+        "error_login":"ログイン失敗。未登録か、メール/パスワードが間違っています。",
+        "verify_msg":"メールを認証してください:","btn_check":"認証済み、入る",
+        "unpaid_msg":"サブスクリプションが必要です。","upgrade_title":"プロフェッショナルプラン",
+        "pay_btn":"今すぐ購読","welcome_title":"SarSa AI へようこそ",
+        "welcome_desc":"オールインワンの視覚的物件インテリジェンス＆販売自動化プラットフォーム。物件の写真を数秒でプロフェッショナルな資産に変換します。",
+        "login_prompt":"アプリを使用するにはログインしてください",
+        "forgot_pw":"パスワードをお忘れですか？","btn_reset":"リンクを送信",
+        "reset_success":"リセットリンクを送信しました！受信トレイをご確認ください。",
+        "reset_not_found":"このメールアドレスのアカウントが見つかりません。先に登録してください。",
+        "reset_invalid_email":"有効なメールアドレスを入力してください。",
+        "email_verified_title":"✅ メールが正常に認証されました！",
+        "email_verified_msg":"アカウントが確認されました。下記からログインしてください。",
+        "pw_reset_title":"新しいパスワードを設定",
+        "pw_reset_desc":"新しいパスワードを入力してください。保存後に自動的にログインされます。",
+        "pw_reset_btn":"✅ パスワードを保存してログイン",
+        "pw_reset_cancel":"❌ キャンセル",
+        "pw_reset_success":"✅ パスワードが更新されました！ログイン中...",
+        "pw_reset_min_err":"❌ 6文字以上必要です。",
+        "new_pw_label":"新しいパスワード",
     },
     "简体中文": {
-        "access": "SarSa AI 访问", "login": "登录", "register": "注册",
-        "email": "邮箱", "password": "密码", "btn_login": "登录",
-        "btn_reg": "创建账号",
-        "success_reg": "注册成功！请检查邮箱以验证账号。",
-        "error_login": "登录失败。您未注册，或邮箱/密码错误。",
-        "verify_msg": "请验证您的邮箱:", "btn_check": "已验证，进入",
-        "unpaid_msg": "需要订阅。", "upgrade_title": "专业版方案",
-        "pay_btn": "立即订阅", "welcome_title": "欢迎来到 SarSa AI",
-        "welcome_desc": "全方位房产视觉智能与全球销售自动化平台。在几秒钟内将您的房产照片转化为专业的营销资产。",
-        "login_prompt": "登录以使用该应用程序",
-        "forgot_pw": "忘记密码？", "btn_reset": "发送重置链接",
-        "reset_success": "重置链接已发送到您的邮箱。",
-        # ← NEW
-        "email_verified_title": "✅ 邮箱验证成功！",
-        "email_verified_msg": "您的账号已确认。请在下方登录以开始使用。",
-        "pw_reset_title": "🔒 设置您的新密码",
-        "pw_reset_desc": "为您的账号输入新密码。保存后将自动登录。",
-        "pw_reset_btn": "保存密码并登录",
-        "pw_reset_cancel": "取消",
-        "pw_reset_success": "✅ 密码已更新！正在登录...",
-        "pw_reset_min_err": "❌ 密码至少需要6位。",
+        "access":"SarSa AI 访问","login":"登录","register":"注册",
+        "email":"邮箱","password":"密码","btn_login":"登录",
+        "btn_reg":"创建账号",
+        "success_reg":"注册成功！请检查邮箱以验证账号。",
+        "error_login":"登录失败。您未注册，或邮箱/密码错误。",
+        "verify_msg":"请验证您的邮箱:","btn_check":"已验证，进入",
+        "unpaid_msg":"需要订阅。","upgrade_title":"专业版方案",
+        "pay_btn":"立即订阅","welcome_title":"欢迎来到 SarSa AI",
+        "welcome_desc":"全方位房产视觉智能与全球销售自动化平台。在几秒钟内将您的房产照片转化为专业的营销资产。",
+        "login_prompt":"登录以使用该应用程序",
+        "forgot_pw":"忘记密码？","btn_reset":"发送重置链接",
+        "reset_success":"重置链接已发送！请检查您的邮箱。",
+        "reset_not_found":"未找到使用此邮箱注册的账号，请先注册。",
+        "reset_invalid_email":"请输入有效的电子邮件地址。",
+        "email_verified_title":"✅ 邮箱验证成功！",
+        "email_verified_msg":"您的账号已确认。请在下方登录以开始使用。",
+        "pw_reset_title":"设置您的新密码",
+        "pw_reset_desc":"为您的账号输入新密码。保存后将自动登录。",
+        "pw_reset_btn":"✅ 保存密码并登录",
+        "pw_reset_cancel":"❌ 取消",
+        "pw_reset_success":"✅ 密码已更新！正在登录...",
+        "pw_reset_min_err":"❌ 密码至少需要6位。",
+        "new_pw_label":"新密码",
     },
     "العربية": {
-        "access": "دخول SarSa AI", "login": "تسجيل الدخول", "register": "إنشاء حساب",
-        "email": "البريد", "password": "كلمة السر", "btn_login": "دخول",
-        "btn_reg": "إنشاء حساب",
-        "success_reg": "تم التسجيل بنجاح! تحقق من بريدك لتأكيد الحساب.",
-        "error_login": "فشل الدخول. أنت غير مسجل، أو البريد/كلمة السر خاطئة.",
-        "verify_msg": "يرجى تأكيد بريدك:", "btn_check": "تم التأكيد، دخول",
-        "unpaid_msg": "يتطلب اشتراكاً نشطاً.", "upgrade_title": "الباقة الاحترافية",
-        "pay_btn": "اشترك الآن", "welcome_title": "مرحباً بك في SarSa AI",
-        "welcome_desc": "منصة الذكاء البصري المتكامل للعقارات وأتمتة المبيعات العالمية. حول صور عقاراتك إلى أصول احترافية في ثوانٍ.",
-        "login_prompt": "قم بتسجيل الدخول لاستخدام التطبيق",
-        "forgot_pw": "نسيت كلمة السر؟", "btn_reset": "إرسال رابط الاستعادة",
-        "reset_success": "تم إرسال رابط إعادة التعيين.",
-        # ← NEW
-        "email_verified_title": "✅ تم التحقق من البريد بنجاح!",
-        "email_verified_msg": "تم تأكيد حسابك. يرجى تسجيل الدخول أدناه للبدء.",
-        "pw_reset_title": "🔒 تعيين كلمة المرور الجديدة",
-        "pw_reset_desc": "أدخل كلمة مرور جديدة لحسابك. سيتم تسجيل دخولك تلقائياً بعد الحفظ.",
-        "pw_reset_btn": "حفظ كلمة المرور وتسجيل الدخول",
-        "pw_reset_cancel": "إلغاء",
-        "pw_reset_success": "✅ تم تحديث كلمة المرور! جاري تسجيل الدخول...",
-        "pw_reset_min_err": "❌ يجب أن تكون 6 خانات على الأقل.",
+        "access":"دخول SarSa AI","login":"تسجيل الدخول","register":"إنشاء حساب",
+        "email":"البريد","password":"كلمة السر","btn_login":"دخول",
+        "btn_reg":"إنشاء حساب",
+        "success_reg":"تم التسجيل بنجاح! تحقق من بريدك لتأكيد الحساب.",
+        "error_login":"فشل الدخول. أنت غير مسجل، أو البريد/كلمة السر خاطئة.",
+        "verify_msg":"يرجى تأكيد بريدك:","btn_check":"تم التأكيد، دخول",
+        "unpaid_msg":"يتطلب اشتراكاً نشطاً.","upgrade_title":"الباقة الاحترافية",
+        "pay_btn":"اشترك الآن","welcome_title":"مرحباً بك في SarSa AI",
+        "welcome_desc":"منصة الذكاء البصري المتكامل للعقارات وأتمتة المبيعات العالمية. حول صور عقاراتك إلى أصول احترافية في ثوانٍ.",
+        "login_prompt":"قم بتسجيل الدخول لاستخدام التطبيق",
+        "forgot_pw":"نسيت كلمة السر؟","btn_reset":"إرسال رابط الاستعادة",
+        "reset_success":"تم إرسال رابط إعادة التعيين! تحقق من صندوق الوارد.",
+        "reset_not_found":"لم يتم العثور على حساب بهذا البريد. يرجى التسجيل أولاً.",
+        "reset_invalid_email":"يرجى إدخال عنوان بريد إلكتروني صالح.",
+        "email_verified_title":"✅ تم التحقق من البريد بنجاح!",
+        "email_verified_msg":"تم تأكيد حسابك. يرجى تسجيل الدخول أدناه للبدء.",
+        "pw_reset_title":"تعيين كلمة المرور الجديدة",
+        "pw_reset_desc":"أدخل كلمة مرور جديدة لحسابك. سيتم تسجيل دخولك تلقائياً بعد الحفظ.",
+        "pw_reset_btn":"✅ حفظ كلمة المرور وتسجيل الدخول",
+        "pw_reset_cancel":"❌ إلغاء",
+        "pw_reset_success":"✅ تم تحديث كلمة المرور! جاري تسجيل الدخول...",
+        "pw_reset_min_err":"❌ يجب أن تكون 6 خانات على الأقل.",
+        "new_pw_label":"كلمة المرور الجديدة",
     }
 }
 
@@ -412,10 +429,7 @@ ui_languages = {
     "العربية": { "title": "SarSa AI | منصة الذكاء العقاري", "service_desc": "الذكاء البصري المتكامل للعقارات وأتمتة المبيعات العالمية", "subtitle": "حول صور العقارات فوراً إلى إعلانات مميزة، حقائب تواصل اجتماعي، سيناريوهات فيديو، مواصفات فنية، حملات بريدية ونصوص SEO.", "settings": "الإعدادات", "target_lang": "لغة الكتابة...", "prop_type": "نوع العقار", "price": "سعر السوق", "location": "الموقع", "tone": "استراتيجية التسويق", "tones": ["احترافي قياسي", "فخامة فائقة", "تركيز استثماري", "عصري بسيط", "حياة عائلية", "تأجير سياحي", "تجاري"], "ph_prop": "مثال: شقة 3+1، فيلا فاخرة...", "ph_price": "مثال: 850,000$ أو 2,500$ شهرياً...", "ph_loc": "مثال: دبي مارينا، الرياض، القاهرة...", "bedrooms": "غرف النوم", "bathrooms": "الحمامات", "area": "المساحة", "year_built": "سنة البناء", "ph_beds": "مثال: 3", "ph_baths": "مثال: 2", "ph_area": "مثال: 185 م²", "ph_year": "مثال: 2022", "furnishing": "حالة التأثيث", "furnishing_opts": ["غير محدد", "مفروش بالكامل", "مفروش جزئياً", "غير مفروش"], "target_audience": "الجمهور المستهدف", "audience_opts": ["السوق العام", "مشتري الفخامة", "المستثمرون", "المغتربون", "مشتري لأول مرة", "سوق العطلات", "مستأجر تجاري"], "custom_inst": "ملاحظات خاصة ومميزات", "custom_inst_ph": "مثال: مسبح خاص، إطلالة بانورامية، منزل ذكي...", "btn": "إنشاء الأصول المختارة", "upload_label": "ضع صور العقار هنا", "result": "معاينة تنفيذية", "loading": "جاري تجهيز منظومتك التسويقية الفاخرة...", "empty": "في انتظار الصور لبدء التحليل المهني. ارفع الصور واملأ التفاصيل على اليسار.", "download": "تصدير القسم (TXT)", "save_btn": "حفظ التغييرات", "saved_msg": "تم الحفظ!", "error": "خطأ:", "clear_btn": "إعادة تعيين", "select_sections": "اختر الأقسام المراد إنشاؤها", "tab_main": "الإعلان الرئيسي", "tab_social": "حقيبة التواصل", "tab_video": "سيناريو الفيديو", "tab_tech": "المواصفات الفنية", "tab_email": "حملة البريد", "tab_seo": "نصوص الويب وSEO", "tab_photo": "دليل التصوير", "label_main": "نص المبيعات", "label_social": "محتوى التواصل", "label_video": "سيناريو الفيديو", "label_tech": "المواصفات الفنية", "label_email": "حملة البريد الإلكتروني", "label_seo": "نص SEO", "label_photo": "توصيات التصوير الفوتوغرافي", "extra_details": "تفاصيل العقار الإضافية", "interface_lang": "لغة الواجهة", "logout": "تسجيل الخروج", "acc_settings": "إعدادات الحساب", "update_pw": "تحديث كلمة السر", "new_pw": "كلمة سر جديدة", "btn_update": "تحديث الآن", "danger_zone": "منطقة خطر", "delete_confirm": "أريد حذف حسابي نهائياً.", "btn_delete": "حذف الحساب", "pw_min_err": "يجب أن تكون 6 خانات على الأقل.", "delete_email_sent": "تم إرسال بريد التأكيد! تحقق من صندوق الوارد.", "delete_email_fail": "فشل إرسال البريد. تحقق من إعدادات SMTP." }
 }
 
-# ─── HANDLE: Email verification confirmation (?type=signup) ───────────────────
-# When user clicks the Supabase verification email link, the hash is converted
-# to query params by JS above. We detect type=signup here and set a flag so
-# the login screen shows a friendly green success banner.
+# ─── Handle: Email verification (type=signup) ─────────────────────────────────
 if "access_token" in query_params and query_params.get("type") == "signup":
     _at_signup = query_params.get("access_token", "")
     _rt_signup = query_params.get("refresh_token", "")
@@ -428,9 +442,7 @@ if "access_token" in query_params and query_params.get("type") == "signup":
     st.query_params.clear()
     st.rerun()
 
-# ─── RECOVERY — Handle ?access_token= (implicit flow, converted from hash by JS)
-# FIX: Supabase reset emails use implicit flow (#access_token=...&type=recovery).
-# The JS snippet above converts the hash to query params so Python can read them.
+# ─── Handle: Password recovery (type=recovery) ────────────────────────────────
 if "access_token" in query_params and query_params.get("type") == "recovery":
     _at = query_params.get("access_token", "")
     _rt = query_params.get("refresh_token", "")
@@ -446,24 +458,20 @@ if "access_token" in query_params and query_params.get("type") == "recovery":
     st.query_params.clear()
     st.rerun()
 
-# ─── RECOVERY (PKCE) — Handle ?code= from Supabase reset email ────────────────
-# Some Supabase versions / configurations use PKCE flow with a ?code= param.
+# ─── Handle: PKCE flow (?code=) ───────────────────────────────────────────────
 if "code" in query_params:
-    _code_val = query_params["code"]
+    _code_val  = query_params["code"]
     _sess_data = None
-
     for _arg in [{"auth_code": _code_val}, _code_val]:
         try:
-            _sess_data = supabase.auth.exchange_code_for_session(_arg)
-            break
+            _sess_data = supabase.auth.exchange_code_for_session(_arg); break
         except TypeError:
             continue
         except Exception:
             break
-
     if _sess_data is not None:
         try:
-            _s = getattr(_sess_data, 'session', None) or _sess_data
+            _s  = getattr(_sess_data, 'session', None) or _sess_data
             _at = getattr(_s, 'access_token', None)
             _rt = getattr(_s, 'refresh_token', None)
             if _at:
@@ -471,7 +479,6 @@ if "code" in query_params:
                 st.session_state.refresh_token = _rt
         except Exception:
             pass
-
     if not st.session_state.access_token:
         try:
             _live = supabase.auth.get_session()
@@ -483,7 +490,6 @@ if "code" in query_params:
                     st.session_state.refresh_token = _rt2
         except Exception:
             pass
-
     st.session_state.recovery_mode = True
     st.session_state.is_logged_in  = True
     st.query_params.clear()
@@ -494,41 +500,41 @@ if "type" in query_params and query_params["type"] == "recovery":
     st.query_params.clear()
     st.rerun()
 
-# ─── RECOVERY FORM — shown instead of main app while resetting password ────────
+# ─── RECOVERY FORM ────────────────────────────────────────────────────────────
 if st.session_state.recovery_mode:
-    # Get current language texts
     _at_rec = auth_texts.get(st.session_state.auth_lang, auth_texts["English"])
-
     st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
     html, body, [class*="st-"] { font-family: 'Plus Jakarta Sans', sans-serif !important; }
     .stApp { background-color: #f0f4f8 !important; }
-    #MainMenu, footer { display: none !important; }
-    div[data-testid="stDecoration"] { display: none !important; }
-    .block-container { max-width: 520px !important; margin: 0 auto !important; }
-    .stButton > button { background: #0f172a !important; color: white !important; border-radius: 12px !important;
-        padding: 14px 24px !important; font-weight: 700 !important; font-size: 0.95rem !important;
-        width: 100% !important; border: none !important; transition: all 0.25s ease !important;
+    #MainMenu, footer, div[data-testid="stDecoration"] { display: none !important; }
+    .block-container { max-width: 520px !important; margin: 3rem auto !important;
+        background: white; border-radius: 20px; padding: 2.5rem 3rem !important;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; }
+    .stButton > button { background: #0f172a !important; color: white !important;
+        border-radius: 12px !important; padding: 14px 24px !important;
+        font-weight: 700 !important; font-size: 0.95rem !important; width: 100% !important;
+        border: none !important; transition: all 0.25s ease !important;
         box-shadow: 0 4px 15px rgba(15,23,42,0.3) !important; }
     .stButton > button:hover { background: #1e293b !important; transform: translateY(-1px) !important; }
-    </style>
-    """, unsafe_allow_html=True)
+    </style>""", unsafe_allow_html=True)
 
     st.markdown(f"""
-    <div style='text-align:center; padding: 2.5rem 0 1.5rem;'>
-      <div style='font-size:3rem; margin-bottom:0.5rem;'>🔒</div>
-      <h1 style='color:#0f172a; font-weight:800; font-size:1.8rem; margin:0;'>{_at_rec.get("pw_reset_title", "🔒 Set Your New Password")}</h1>
-      <p style='color:#64748b; margin-top:0.6rem; font-size:1rem;'>{_at_rec.get("pw_reset_desc", "Enter a new password for your account.")}</p>
-    </div>
-    """, unsafe_allow_html=True)
+    <div style='text-align:center; padding:1rem 0 1.5rem;'>
+      <div style='font-size:3.5rem; margin-bottom:0.6rem;'>🔒</div>
+      <h1 style='color:#0f172a; font-weight:800; font-size:1.7rem; margin:0;'>
+        {_at_rec.get("pw_reset_title","Set Your New Password")}
+      </h1>
+      <p style='color:#64748b; margin-top:0.6rem; font-size:0.97rem; line-height:1.6;'>
+        {_at_rec.get("pw_reset_desc","Enter a new password for your account.")}
+      </p>
+    </div>""", unsafe_allow_html=True)
 
     with st.form("recovery_form"):
         new_password_recovery = st.text_input(
-            auth_texts.get(st.session_state.auth_lang, auth_texts["English"]).get("new_pw", "New Password") if st.session_state.auth_lang in auth_texts else "New Password",
-            type="password",
-            help="Minimum 6 characters",
-            placeholder="••••••••"
+            _at_rec.get("new_pw_label", "New Password"),
+            type="password", placeholder="••••••••"
         )
         col_sub, col_can = st.columns(2)
         with col_sub:
@@ -558,7 +564,7 @@ if st.session_state.recovery_mode:
                             st.session_state.refresh_token
                         )
                     supabase.auth.update_user({"password": new_password_recovery})
-                    st.success(_at_rec.get("pw_reset_success", "✅ Password updated! You are now logged in."))
+                    st.success(_at_rec.get("pw_reset_success", "✅ Password updated! Logging you in..."))
                     st.session_state.recovery_mode = False
                     st.session_state.is_logged_in  = True
                     import time; time.sleep(1.5)
@@ -589,7 +595,6 @@ def get_status():
     except Exception:
         return "logged_out", None
 
-# ─── UI FLOW ───────────────────────────────────────────────────────────────────
 def update_lang():
     st.session_state.auth_lang = st.session_state.lang_selector
 
@@ -615,17 +620,9 @@ h1 { color: #0f172a !important; font-weight: 800 !important; text-align: center;
 .stButton > button { background: #0f172a !important; color: white !important; border-radius: 12px !important; padding: 14px 24px !important; font-weight: 700 !important; font-size: 0.95rem !important; width: 100% !important; border: none !important; transition: all 0.25s ease !important; box-shadow: 0 4px 15px rgba(15,23,42,0.3) !important; letter-spacing: 0.3px !important; }
 .stButton > button:hover { background: #1e293b !important; box-shadow: 0 8px 25px rgba(15,23,42,0.4) !important; transform: translateY(-1px) !important; }
 .stTabs [aria-selected="true"] { background-color: #0f172a !important; color: white !important; border-radius: 8px 8px 0 0 !important; }
-/* ← NEW: Email verified banner */
-.verified-banner {
-    background: linear-gradient(135deg, #dcfce7, #bbf7d0);
-    border: 1.5px solid #16a34a;
-    border-radius: 14px;
-    padding: 1.2rem 1.5rem;
-    margin-bottom: 1.5rem;
-    text-align: center;
-}
-.verified-banner h3 { color: #15803d; margin: 0 0 0.3rem; font-size: 1.15rem; font-weight: 800; }
-.verified-banner p  { color: #166534; margin: 0; font-size: 0.95rem; }
+.verified-banner { background: linear-gradient(135deg,#dcfce7,#bbf7d0); border: 1.5px solid #16a34a; border-radius: 14px; padding: 1.2rem 1.6rem; margin-bottom: 1.5rem; text-align: center; }
+.verified-banner h3 { color: #15803d; margin: 0 0 0.3rem; font-size: 1.1rem; font-weight: 800; }
+.verified-banner p  { color: #166534; margin: 0; font-size: 0.93rem; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -634,9 +631,14 @@ def load_logo(file_path):
     if os.path.exists(file_path): return Image.open(file_path)
     return None
 
-# ─── LOGIN / REGISTER SCREENS ──────────────────────────────────────────────────
+# ─── LOGIN / REGISTER SCREENS ─────────────────────────────────────────────────
 if auth_status != "paid":
-    st.selectbox("🌐 Select Language / Dil Seçin", list(auth_texts.keys()), index=list(auth_texts.keys()).index(st.session_state.auth_lang) if st.session_state.auth_lang in auth_texts else 0, key="lang_selector", on_change=update_lang)
+    st.selectbox(
+        "🌐 Select Language / Dil Seçin",
+        list(auth_texts.keys()),
+        index=list(auth_texts.keys()).index(st.session_state.auth_lang) if st.session_state.auth_lang in auth_texts else 0,
+        key="lang_selector", on_change=update_lang
+    )
     at = auth_texts.get(st.session_state.auth_lang, auth_texts["English"])
 
     col_logo, col_text = st.columns([1, 6])
@@ -644,21 +646,19 @@ if auth_status != "paid":
         logo_login = load_logo("SarSa_Logo_Transparent.png")
         if logo_login: st.image(logo_login, use_container_width=True)
     with col_text:
-        st.markdown(f"<h1 style='text-align:left; color:#0f172a; font-weight:800; margin-top:0; padding-top:0;'>{at['welcome_title']}</h1>", unsafe_allow_html=True)
-        st.markdown(f"<p style='font-size:1.15rem; color:#475569; font-weight:500; margin-bottom:2rem;'>{at['welcome_desc']}</p>", unsafe_allow_html=True)
+        st.markdown(f"<h1 style='text-align:left;color:#0f172a;font-weight:800;margin-top:0;padding-top:0;'>{at['welcome_title']}</h1>", unsafe_allow_html=True)
+        st.markdown(f"<p style='font-size:1.15rem;color:#475569;font-weight:500;margin-bottom:2rem;'>{at['welcome_desc']}</p>", unsafe_allow_html=True)
 
-    # ── NEW: Email verification success banner ─────────────────────────────────
+    # ── Email verified green banner ────────────────────────────────────────────
     if st.session_state.email_verified:
         st.markdown(f"""
         <div class="verified-banner">
-          <h3>{at.get("email_verified_title", "✅ Email Verified Successfully!")}</h3>
-          <p>{at.get("email_verified_msg", "Your account has been confirmed. Please log in below to get started.")}</p>
-        </div>
-        """, unsafe_allow_html=True)
-        # Reset flag after showing once
+          <h3>{at.get("email_verified_title","✅ Email Verified Successfully!")}</h3>
+          <p>{at.get("email_verified_msg","Your account has been confirmed. Please log in below.")}</p>
+        </div>""", unsafe_allow_html=True)
         st.session_state.email_verified = False
 
-    st.markdown(f"<h3 style='text-align:center; color:#0f172a; margin-bottom:1.5rem;'>{at['login_prompt']}</h3>", unsafe_allow_html=True)
+    st.markdown(f"<h3 style='text-align:center;color:#0f172a;margin-bottom:1.5rem;'>{at['login_prompt']}</h3>", unsafe_allow_html=True)
 
     tab1, tab2, tab3 = st.tabs([f"🔑 {at['login']}", f"📝 {at['register']}", f"❓ {at['forgot_pw']}"])
 
@@ -682,7 +682,7 @@ if auth_status != "paid":
                     elif "Invalid login credentials" in error_msg:
                         st.error(f"❌ {at['error_login']}")
                     else:
-                        st.error(f"{error_msg}")
+                        st.error(error_msg)
 
     with tab2:
         with st.form("register_form"):
@@ -705,19 +705,31 @@ if auth_status != "paid":
 
     with tab3:
         with st.form("forgot_pw_form"):
-            email_reset = st.text_input(at["email"])
+            email_reset = st.text_input(at["email"], placeholder="your@email.com")
             if st.form_submit_button(at["btn_reset"]):
-                try:
-                    supabase.auth.reset_password_for_email(
-                        email_reset,
-                        {"redirect_to": "https://sarsa-ai-estateintelligence.streamlit.app/"}
-                    )
-                    st.success(at["reset_success"])
-                except Exception as e:
-                    st.error(f"Error: {e}")
+                email_reset = email_reset.strip()
+                # ── Validation ────────────────────────────────────────────────
+                if not email_reset or "@" not in email_reset:
+                    st.error(at.get("reset_invalid_email", "Please enter a valid email address."))
+                else:
+                    # ── Check if email is registered ──────────────────────────
+                    with st.spinner("Checking..."):
+                        email_exists = is_email_registered(email_reset)
+                    if not email_exists:
+                        st.error(at.get("reset_not_found",
+                            "No account found with this email address. Please register first."))
+                    else:
+                        try:
+                            supabase.auth.reset_password_for_email(
+                                email_reset,
+                                {"redirect_to": "https://sarsa-ai-estateintelligence.streamlit.app/"}
+                            )
+                            st.success(f"✅ {at['reset_success']}")
+                        except Exception as e:
+                            st.error(f"Error: {e}")
     st.stop()
 
-# ─── AI CONFIGURATION ──────────────────────────────────────────────────────────
+# ─── AI CONFIGURATION ─────────────────────────────────────────────────────────
 GOOGLE_API_KEY = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=GOOGLE_API_KEY)
 MODEL_NAME = 'gemini-2.5-flash'
@@ -729,23 +741,20 @@ with st.sidebar:
     if logo_img:
         st.image(logo_img, use_container_width=True)
     else:
-        st.markdown("<div style='text-align:center; padding:0.8rem 0 0.5rem;'><span style='font-size:1.8rem; font-weight:800; color:#0f172a;'>SarSa</span><span style='font-size:1.8rem; font-weight:800; background:linear-gradient(135deg,#3b82f6,#8b5cf6); -webkit-background-clip:text;-webkit-text-fill-color:transparent;'> AI</span></div>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align:center;padding:0.8rem 0 0.5rem;'><span style='font-size:1.8rem;font-weight:800;color:#0f172a;'>SarSa</span><span style='font-size:1.8rem;font-weight:800;background:linear-gradient(135deg,#3b82f6,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;'> AI</span></div>", unsafe_allow_html=True)
 
     st.divider()
 
     current_ui_lang = st.selectbox(
-        f"🌐 {ui_languages.get(st.session_state.auth_lang, ui_languages['English']).get('interface_lang', 'Interface Language')}",
+        f"🌐 {ui_languages.get(st.session_state.auth_lang, ui_languages['English']).get('interface_lang','Interface Language')}",
         list(ui_languages.keys()),
         index=list(ui_languages.keys()).index(st.session_state.auth_lang) if st.session_state.auth_lang in ui_languages else 0
     )
     t = ui_languages[current_ui_lang]
     st.session_state.auth_lang = current_ui_lang
 
-    # ── Account Settings Panel ─────────────────────────────────────────────────
     with st.expander(f"⚙️ {t['acc_settings']}"):
         st.write(st.session_state.user_email)
-
-        # ── Update Password ────────────────────────────────────────────────────
         st.subheader(t["update_pw"])
         new_pw = st.text_input(t["new_pw"], type="password", key="settings_new_pw")
         if st.button(t["btn_update"], key="settings_update_btn"):
@@ -754,28 +763,19 @@ with st.sidebar:
             else:
                 try:
                     if st.session_state.access_token:
-                        supabase.auth.set_session(
-                            st.session_state.access_token,
-                            st.session_state.refresh_token
-                        )
+                        supabase.auth.set_session(st.session_state.access_token, st.session_state.refresh_token)
                     supabase.auth.update_user({"password": new_pw})
                     st.success(t["saved_msg"])
                 except Exception as e:
                     st.error(f"{t['error']} {e}")
-
         st.divider()
-
-        # ── Delete Account ─────────────────────────────────────────────────────
         st.subheader(t["danger_zone"])
         confirm_del = st.checkbox(t["delete_confirm"])
         if st.button(f"❌ {t['btn_delete']}", type="primary", use_container_width=True):
             if confirm_del:
                 try:
                     if st.session_state.access_token:
-                        supabase.auth.set_session(
-                            st.session_state.access_token,
-                            st.session_state.refresh_token
-                        )
+                        supabase.auth.set_session(st.session_state.access_token, st.session_state.refresh_token)
                     user_resp = supabase.auth.get_user()
                     if user_resp and user_resp.user:
                         u_id    = user_resp.user.id
@@ -784,25 +784,22 @@ with st.sidebar:
                         cancel_token  = str(uuid.uuid4())
                         expires_at    = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
                         supabase.table("pending_deletions").insert({
-                            "user_id":       u_id,
-                            "user_email":    u_email,
-                            "confirm_token": confirm_token,
-                            "cancel_token":  cancel_token,
-                            "expires_at":    expires_at
+                            "user_id": u_id, "user_email": u_email,
+                            "confirm_token": confirm_token, "cancel_token": cancel_token,
+                            "expires_at": expires_at
                         }).execute()
                         sent, smtp_err = send_delete_confirmation_email(u_email, confirm_token, cancel_token)
                         if sent:
-                            st.success(t.get("delete_email_sent", "Confirmation email sent! Check your inbox."))
+                            st.success(t.get("delete_email_sent", "Confirmation email sent!"))
                         else:
-                            st.error(f"{t.get('delete_email_fail', 'Failed to send email.')} — Detail: {smtp_err}")
+                            st.error(f"{t.get('delete_email_fail','Failed to send email.')} — {smtp_err}")
                     else:
-                        st.error("Could not retrieve user. Please logout and log back in, then try again.")
+                        st.error("Could not retrieve user. Please logout and log back in.")
                 except Exception as e:
                     st.error(f"{t['error']} {e}")
             else:
                 st.warning("Please confirm deletion.")
 
-    # ── Logout ─────────────────────────────────────────────────────────────────
     if st.button(f"🚪 {t['logout']}", use_container_width=True):
         supabase.auth.sign_out()
         st.session_state.is_logged_in  = False
@@ -812,8 +809,6 @@ with st.sidebar:
         st.rerun()
 
     st.markdown("---")
-
-    # ── Core Settings ──────────────────────────────────────────────────────────
     st.header(t["settings"])
 
     st.session_state.target_lang_input = st.text_input(f"✍️ {t['target_lang']}", value=st.session_state.target_lang_input)
@@ -822,42 +817,36 @@ with st.sidebar:
     st.session_state.location  = st.text_input(t["location"],  value=st.session_state.location,  placeholder=t["ph_loc"])
 
     current_tone_idx = t["tones"].index(st.session_state.tone) if st.session_state.tone in t["tones"] else 0
-    st.session_state.tone = st.selectbox(t["tone"], t["tones"], index=current_tone_idx)
+    st.session_state.tone         = st.selectbox(t["tone"], t["tones"], index=current_tone_idx)
     st.session_state.audience_idx = st.selectbox(t["target_audience"], range(len(t["audience_opts"])), index=st.session_state.audience_idx, format_func=lambda x: t["audience_opts"][x])
 
     with st.expander(f"➕ {t['extra_details']}"):
-        st.session_state.bedrooms     = st.text_input(t["bedrooms"],   value=st.session_state.bedrooms,   placeholder=t["ph_beds"])
-        st.session_state.bathrooms    = st.text_input(t["bathrooms"],  value=st.session_state.bathrooms,  placeholder=t["ph_baths"])
-        st.session_state.area_size    = st.text_input(t["area"],       value=st.session_state.area_size,  placeholder=t["ph_area"])
-        st.session_state.year_built   = st.text_input(t["year_built"], value=st.session_state.year_built, placeholder=t["ph_year"])
+        st.session_state.bedrooms       = st.text_input(t["bedrooms"],   value=st.session_state.bedrooms,   placeholder=t["ph_beds"])
+        st.session_state.bathrooms      = st.text_input(t["bathrooms"],  value=st.session_state.bathrooms,  placeholder=t["ph_baths"])
+        st.session_state.area_size      = st.text_input(t["area"],       value=st.session_state.area_size,  placeholder=t["ph_area"])
+        st.session_state.year_built     = st.text_input(t["year_built"], value=st.session_state.year_built, placeholder=t["ph_year"])
         st.session_state.furnishing_idx = st.selectbox(t["furnishing"], range(len(t["furnishing_opts"])), index=st.session_state.furnishing_idx, format_func=lambda x: t["furnishing_opts"][x])
 
     st.session_state.custom_inst = st.text_area(f"📝 {t['custom_inst']}", value=st.session_state.custom_inst, placeholder=t["custom_inst_ph"], height=100)
-
     st.markdown("---")
 
     st.subheader(t["select_sections"])
     section_options = {
-        t["tab_main"]:   "main",
-        t["tab_social"]: "social",
-        t["tab_video"]:  "video",
-        t["tab_tech"]:   "tech",
-        t["tab_email"]:  "email",
-        t["tab_seo"]:    "seo",
+        t["tab_main"]:   "main",  t["tab_social"]: "social",
+        t["tab_video"]:  "video", t["tab_tech"]:   "tech",
+        t["tab_email"]:  "email", t["tab_seo"]:    "seo",
         t["tab_photo"]:  "photo"
     }
     st.session_state.selected_sections = st.multiselect(
-        "Seçenekler:",
-        options=list(section_options.keys()),
-        default=list(section_options.keys()),
-        label_visibility="collapsed"
+        "Seçenekler:", options=list(section_options.keys()),
+        default=list(section_options.keys()), label_visibility="collapsed"
     )
 
-# ─── MAIN CONTENT ──────────────────────────────────────────────────────────────
-st.markdown(f"<h1 style='text-align: center;'>🏢 {t['title']}</h1>", unsafe_allow_html=True)
-st.markdown(f"<p style='text-align: center; color: #64748b; font-size: 1.1rem; margin-bottom: 2rem;'>{t.get('subtitle', t['service_desc'])}</p>", unsafe_allow_html=True)
+# ─── MAIN CONTENT ─────────────────────────────────────────────────────────────
+st.markdown(f"<h1 style='text-align:center;'>🏢 {t['title']}</h1>", unsafe_allow_html=True)
+st.markdown(f"<p style='text-align:center;color:#64748b;font-size:1.1rem;margin-bottom:2rem;'>{t.get('subtitle',t['service_desc'])}</p>", unsafe_allow_html=True)
 
-uploaded_files = st.file_uploader(f"📸 {t['upload_label']}", type=["jpg", "png", "webp", "jpeg"], accept_multiple_files=True)
+uploaded_files = st.file_uploader(f"📸 {t['upload_label']}", type=["jpg","png","webp","jpeg"], accept_multiple_files=True)
 
 if uploaded_files:
     images_for_ai = [Image.open(f) for f in uploaded_files]
@@ -867,26 +856,23 @@ if uploaded_files:
             st.image(img, use_container_width=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-    if st.button(f"🚀 {t.get('btn', 'GENERATE SELECTED ASSETS')}", use_container_width=True):
+    if st.button(f"🚀 {t.get('btn','GENERATE SELECTED ASSETS')}", use_container_width=True):
         if not st.session_state.selected_sections:
             st.warning("Please select at least one asset to generate from the sidebar.")
         else:
-            with st.spinner(t.get('loading', 'Crafting your premium marketing ecosystem...')):
+            with st.spinner(t.get('loading','Crafting your premium marketing ecosystem...')):
                 st.success("Talebiniz AI'a iletildi! Seçtiğiniz alanlar için içerikler hazırlanıyor.")
-
             tabs = st.tabs(st.session_state.selected_sections)
-
             for idx, selected_tab in enumerate(st.session_state.selected_sections):
                 with tabs[idx]:
                     st.subheader(selected_tab)
                     st.write(f"Bu alana {selected_tab} ile ilgili üretilen harika AI içerikleri gelecek.")
                     st.button(f"📥 {t['download']} - {selected_tab}", key=f"dl_{idx}")
-
 else:
     st.markdown(f"""
-    <div style='text-align:center; padding: 3rem; background: #f8fafc; border-radius: 12px; border: 2px dashed #cbd5e1; margin-top: 2rem;'>
-      <h3 style='color: #475569;'>🏘️ {t.get('result', 'Executive Preview')}</h3>
-      <p style='color: #94a3b8;'>{t['empty']}</p>
+    <div style='text-align:center;padding:3rem;background:#f8fafc;border-radius:12px;border:2px dashed #cbd5e1;margin-top:2rem;'>
+      <h3 style='color:#475569;'>🏘️ {t.get('result','Executive Preview')}</h3>
+      <p style='color:#94a3b8;'>{t['empty']}</p>
       <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:1.4rem;">
         <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">📝 {t['tab_main']}</span>
         <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">📱 {t['tab_social']}</span>
@@ -894,7 +880,6 @@ else:
         <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">⚙️ {t['tab_tech']}</span>
         <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">✉️ {t['tab_email']}</span>
         <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">🔍 {t['tab_seo']}</span>
-        <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">📸 {t.get('tab_photo', 'Photo Guide')}</span>
+        <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">📸 {t.get('tab_photo','Photo Guide')}</span>
       </div>
-    </div>
-    """, unsafe_allow_html=True)
+    </div>""", unsafe_allow_html=True)
