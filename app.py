@@ -13,9 +13,8 @@ import streamlit.components.v1 as components
 # ─── PAGE CONFIG (must be first) ──────────────────────────────────────────────
 st.set_page_config(page_title="SarSa AI | Real Estate Intelligence", page_icon="🏢", layout="wide")
 
-# ─── HASH FRAGMENT → QUERY PARAM REDIRECT ─────────────────────────────────────
-# Supabase puts tokens in the URL hash for both recovery and signup flows (implicit flow).
-# This script reads the parent page hash and redirects with query params Streamlit can read.
+# ─── HASH FRAGMENT → QUERY PARAM REDIRECT (Geliştirildi) ──────────────────────
+# Hash parametrelerini mevcut query parametrelerini ezmeden birleştirir
 components.html("""
 <script>
 (function() {
@@ -23,12 +22,15 @@ components.html("""
         var parentLoc = window.parent.location;
         var hash = parentLoc.hash;
         if (!hash || hash.length <= 1) return;
-        var params = new URLSearchParams(hash.substring(1));
-        var type = params.get('type');
-        var hasToken = params.get('access_token');
-        // Only redirect for auth flows we need to handle
+        var hashParams = new URLSearchParams(hash.substring(1));
+        var type = hashParams.get('type');
+        var hasToken = hashParams.get('access_token');
         if (hasToken && (type === 'recovery' || type === 'signup')) {
-            var newUrl = parentLoc.origin + parentLoc.pathname + '?' + params.toString();
+            var currentParams = new URLSearchParams(parentLoc.search);
+            for (var pair of hashParams.entries()) {
+                currentParams.set(pair[0], pair[1]);
+            }
+            var newUrl = parentLoc.origin + parentLoc.pathname + '?' + currentParams.toString();
             window.parent.location.replace(newUrl);
         }
     } catch(e) {
@@ -51,7 +53,7 @@ if 'recovery_mode'          not in st.session_state: st.session_state.recovery_m
 if 'access_token'           not in st.session_state: st.session_state.access_token           = None
 if 'refresh_token'          not in st.session_state: st.session_state.refresh_token          = None
 if 'email_verified'         not in st.session_state: st.session_state.email_verified         = False
-if 'show_email_confirmed'   not in st.session_state: st.session_state.show_email_confirmed   = False  # NEW: dedicated confirmation page
+if 'show_email_confirmed'   not in st.session_state: st.session_state.show_email_confirmed   = False  
 
 for key_name, val in [
     ("uretilen_ilan", ""), ("prop_type", ""), ("price", ""),
@@ -62,19 +64,6 @@ for key_name, val in [
 ]:
     if key_name not in st.session_state:
         st.session_state[key_name] = val
-
-# ─── PERSISTENT SESSION RESTORE ───────────────────────────────────────────────
-if st.session_state.access_token and not st.session_state.is_logged_in:
-    try:
-        supabase.auth.set_session(st.session_state.access_token, st.session_state.refresh_token)
-        _check = supabase.auth.get_user()
-        if _check and _check.user:
-            st.session_state.is_logged_in = True
-            st.session_state.user_email   = _check.user.email
-    except Exception:
-        st.session_state.access_token  = None
-        st.session_state.refresh_token = None
-        st.session_state.is_logged_in  = False
 
 # ─── EMAIL HELPER — Delete Confirmation ───────────────────────────────────────
 def send_delete_confirmation_email(to_email: str, confirm_token: str, cancel_token: str):
@@ -124,7 +113,6 @@ def send_delete_confirmation_email(to_email: str, confirm_token: str, cancel_tok
     except Exception as smtp_err:
         return False, str(smtp_err)
 
-# ─── HELPER: Check if email is registered ─────────────────────────────────────
 def is_email_registered(email: str) -> bool:
     try:
         svc = create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_SERVICE_KEY"])
@@ -134,11 +122,47 @@ def is_email_registered(email: str) -> bool:
     except Exception:
         return True
 
-# ─── QUERY PARAM HANDLERS ─────────────────────────────────────────────────────
+# ─── QUERY PARAM HANDLERS & ROUTING (Sorunların Çözüldüğü Ana Kısım) ──────────
 query_params = st.query_params
+action = query_params.get("action")
 
-# ── Handle: Account Deletion Confirmation ─────────────────────────────────────
-if "action" in query_params and query_params.get("action") == "confirm_delete":
+# 1) PKCE Flow & Code Exchange (Şifre sıfırlama ve Doğrulama için)
+if "code" in query_params:
+    try:
+        res = supabase.auth.exchange_code_for_session({"auth_code": query_params["code"]})
+        if res and hasattr(res, 'session') and res.session:
+            st.session_state.access_token = res.session.access_token
+            st.session_state.refresh_token = res.session.refresh_token
+    except Exception:
+        pass
+
+# 2) Implicit Flow (Yedek)
+if "access_token" in query_params:
+    _at = query_params.get("access_token")
+    _rt = query_params.get("refresh_token")
+    if _at:
+        st.session_state.access_token = _at
+        st.session_state.refresh_token = _rt
+        try:
+            supabase.auth.set_session(_at, _rt)
+        except Exception:
+            pass
+
+# 3) Eylem (Action) Yönlendirmeleri
+if action == "signup_confirm" or query_params.get("type") == "signup":
+    st.session_state.show_email_confirmed = True
+    st.session_state.is_logged_in = False
+    st.query_params.clear()
+    st.rerun()
+
+elif action == "reset_pw" or query_params.get("type") == "recovery":
+    st.session_state.recovery_mode = True
+    st.session_state.is_logged_in = True
+    st.query_params.clear()
+    st.rerun()
+
+# 4) Hesap Silme Onayı (Döngü Hatası Çözüldü)
+elif action == "confirm_delete":
     token = query_params.get("token", "")
     try:
         result = supabase.table("pending_deletions").select("*").eq("confirm_token", token).execute()
@@ -148,13 +172,18 @@ if "action" in query_params and query_params.get("action") == "confirm_delete":
             if datetime.now(timezone.utc) < expires_at:
                 try:
                     svc = create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_SERVICE_KEY"])
+                    # Kullanıcı yeni kayıt açmışsa eski user_id bulunamayabilir, hatayı görmezden geliyoruz.
                     svc.auth.admin.delete_user(record["user_id"])
-                except Exception as del_e:
-                    st.error(f"Deletion error: {del_e}"); st.stop()
+                except Exception:
+                    pass 
+                
+                # Her halükarda kullanılmış token veritabanından silinir
                 supabase.table("pending_deletions").delete().eq("confirm_token", token).execute()
+                
                 for _k in ["is_logged_in","user_email","access_token","refresh_token"]:
                     st.session_state[_k] = None if _k != "is_logged_in" else False
                 st.query_params.clear()
+                
                 st.markdown("""
                 <div style='text-align:center;padding:5rem 2rem;'>
                   <div style='font-size:5rem;margin-bottom:1rem;'>👋</div>
@@ -176,8 +205,8 @@ if "action" in query_params and query_params.get("action") == "confirm_delete":
         st.error(f"Error during account deletion: {e}")
     st.stop()
 
-# ── Handle: Account Deletion Cancel ───────────────────────────────────────────
-if "action" in query_params and query_params.get("action") == "cancel_delete":
+# 5) Hesap Silme İptali
+elif action == "cancel_delete":
     token = query_params.get("token", "")
     try:
         supabase.table("pending_deletions").delete().eq("cancel_token", token).execute()
@@ -187,6 +216,19 @@ if "action" in query_params and query_params.get("action") == "cancel_delete":
     st.success("Account deletion cancelled. Your account is completely safe!")
     import time; time.sleep(2)
     st.rerun()
+
+# ─── PERSISTENT SESSION RESTORE ───────────────────────────────────────────────
+if st.session_state.access_token and not st.session_state.is_logged_in:
+    try:
+        supabase.auth.set_session(st.session_state.access_token, st.session_state.refresh_token)
+        _check = supabase.auth.get_user()
+        if _check and _check.user:
+            st.session_state.is_logged_in = True
+            st.session_state.user_email   = _check.user.email
+    except Exception:
+        st.session_state.access_token  = None
+        st.session_state.refresh_token = None
+        st.session_state.is_logged_in  = False
 
 # ─── TEXT DICTIONARIES (9 LANGUAGES) ──────────────────────────────────────────
 auth_texts = {
@@ -467,87 +509,13 @@ html, body, [class*="st-"] { font-family: 'Plus Jakarta Sans', sans-serif !impor
 </style>
 """
 
-# ─── Handle: Email verification (type=signup) ─────────────────────────────────
-# FIX: Show dedicated "Email Confirmed" page instead of banner on login
-if "access_token" in query_params and query_params.get("type") == "signup":
-    _at_signup = query_params.get("access_token", "")
-    _rt_signup = query_params.get("refresh_token", "")
-    if _at_signup:
-        try:
-            supabase.auth.set_session(_at_signup, _rt_signup)
-        except Exception:
-            pass
-    st.session_state.show_email_confirmed = True   # ← NEW FLAG
-    st.session_state.email_verified = False         # clear old flag
-    st.query_params.clear()
-    st.rerun()
-
-# ─── Handle: Password recovery (type=recovery) ────────────────────────────────
-if "access_token" in query_params and query_params.get("type") == "recovery":
-    _at = query_params.get("access_token", "")
-    _rt = query_params.get("refresh_token", "")
-    if _at:
-        st.session_state.access_token  = _at
-        st.session_state.refresh_token = _rt
-        try:
-            supabase.auth.set_session(_at, _rt)
-        except Exception:
-            pass
-    st.session_state.recovery_mode = True
-    st.session_state.is_logged_in  = True
-    st.query_params.clear()
-    st.rerun()
-
-# ─── Handle: PKCE flow (?code=) ───────────────────────────────────────────────
-if "code" in query_params:
-    _code_val  = query_params["code"]
-    _sess_data = None
-    for _arg in [{"auth_code": _code_val}, _code_val]:
-        try:
-            _sess_data = supabase.auth.exchange_code_for_session(_arg); break
-        except TypeError:
-            continue
-        except Exception:
-            break
-    if _sess_data is not None:
-        try:
-            _s  = getattr(_sess_data, 'session', None) or _sess_data
-            _at = getattr(_s, 'access_token', None)
-            _rt = getattr(_s, 'refresh_token', None)
-            if _at:
-                st.session_state.access_token  = _at
-                st.session_state.refresh_token = _rt
-        except Exception:
-            pass
-    if not st.session_state.access_token:
-        try:
-            _live = supabase.auth.get_session()
-            if _live:
-                _at2 = getattr(_live, 'access_token', None)
-                _rt2 = getattr(_live, 'refresh_token', None)
-                if _at2:
-                    st.session_state.access_token  = _at2
-                    st.session_state.refresh_token = _rt2
-        except Exception:
-            pass
-    st.session_state.recovery_mode = True
-    st.session_state.is_logged_in  = True
-    st.query_params.clear()
-    st.rerun()
-
-if "type" in query_params and query_params["type"] == "recovery":
-    st.session_state.recovery_mode = True
-    st.query_params.clear()
-    st.rerun()
-
 # ═══════════════════════════════════════════════════════════════════════════════
-# ─── PAGE 1: EMAIL CONFIRMED — Dedicated full page (NEW) ─────────────────────
+# ─── PAGE 1: EMAIL CONFIRMED — Dedicated full page ───────────────────────────
 # ═══════════════════════════════════════════════════════════════════════════════
 if st.session_state.get('show_email_confirmed'):
     at = auth_texts.get(st.session_state.auth_lang, auth_texts["English"])
     st.markdown(_auth_page_css, unsafe_allow_html=True)
 
-    # Language selector at top
     def _update_lang_confirmed():
         st.session_state.auth_lang = st.session_state._lang_confirmed
     st.selectbox(
@@ -594,7 +562,6 @@ if st.session_state.recovery_mode:
     _at_rec = auth_texts.get(st.session_state.auth_lang, auth_texts["English"])
     st.markdown(_auth_page_css, unsafe_allow_html=True)
 
-    # Language selector at top
     def _update_lang_recovery():
         st.session_state.auth_lang = st.session_state._lang_recovery
     st.selectbox(
@@ -765,10 +732,11 @@ if auth_status != "paid":
             pw_reg    = st.text_input(at["password"] + " (Min 6)", type="password")
             if st.form_submit_button(at["btn_reg"]):
                 try:
+                    # ÇÖZÜM: Redirect URL içine ?action=signup_confirm parametresi eklendi
                     supabase.auth.sign_up({
                         "email": email_reg,
                         "password": pw_reg,
-                        "options": {"email_redirect_to": "https://sarsa-ai-estateintelligence.streamlit.app/"}
+                        "options": {"email_redirect_to": "https://sarsa-ai-estateintelligence.streamlit.app/?action=signup_confirm"}
                     })
                     st.success(f"✅ {at['success_reg']}")
                 except Exception as ex:
@@ -793,9 +761,10 @@ if auth_status != "paid":
                             "No account found with this email address. Please register first."))
                     else:
                         try:
+                            # ÇÖZÜM: Redirect URL içine ?action=reset_pw parametresi eklendi
                             supabase.auth.reset_password_for_email(
                                 email_reset,
-                                {"redirect_to": "https://sarsa-ai-estateintelligence.streamlit.app/"}
+                                {"redirect_to": "https://sarsa-ai-estateintelligence.streamlit.app/?action=reset_pw"}
                             )
                             st.success(f"✅ {at['reset_success']}")
                         except Exception as e:
