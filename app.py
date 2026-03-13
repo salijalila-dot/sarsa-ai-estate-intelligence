@@ -23,13 +23,12 @@ st.set_page_config(
     page_icon="🏢", layout="wide"
 )
 
-@st.cache_resource
+# Cache (bellek) kullanmadan doğrudan tanımlıyoruz
 def get_cookie_manager():
-    if stx is not None:
-        return stx.CookieManager()
-    return None
+    return stx.CookieManager()
 
 cookie_manager = get_cookie_manager()
+
 
 # ─── SUPABASE ─────────────────────────────────────────────────────────────────
 SUPABASE_URL: str = st.secrets["SUPABASE_URL"]
