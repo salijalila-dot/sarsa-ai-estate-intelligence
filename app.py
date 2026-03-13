@@ -901,12 +901,51 @@ if uploaded_files:
         else:
             with st.spinner(t.get('loading','Crafting your premium marketing ecosystem...')):
                 st.success("Talebiniz AI'a iletildi! Seçtiğiniz alanlar için içerikler hazırlanıyor.")
+            
+            # Form verilerini Gemini için derliyoruz
+            prompt_context = f"""
+            Target Language: {st.session_state.target_lang_input}
+            Property Type: {st.session_state.prop_type}
+            Price: {st.session_state.price}
+            Location: {st.session_state.location}
+            Marketing Strategy/Tone: {st.session_state.tone}
+            Target Audience: {t['audience_opts'][st.session_state.audience_idx]}
+            Bedrooms: {st.session_state.bedrooms}
+            Bathrooms: {st.session_state.bathrooms}
+            Area: {st.session_state.area_size}
+            Year Built: {st.session_state.year_built}
+            Furnishing: {t['furnishing_opts'][st.session_state.furnishing_idx]}
+            Special Notes: {st.session_state.custom_inst}
+            """
+
             tabs = st.tabs(st.session_state.selected_sections)
+            
             for idx, selected_tab in enumerate(st.session_state.selected_sections):
                 with tabs[idx]:
                     st.subheader(selected_tab)
-                    st.write(f"Bu alana {selected_tab} ile ilgili üretilen harika AI içerikleri gelecek.")
-                    st.button(f"📥 {t['download']} - {selected_tab}", key=f"dl_{idx}")
+                    with st.spinner(f"AI is generating {selected_tab}..."):
+                        specific_prompt = f"""
+                        Based on the provided images and the following property details:
+                        {prompt_context}
+                        
+                        Please generate a highly professional '{selected_tab}' for this real estate property. 
+                        Write the final response entirely in {st.session_state.target_lang_input}. 
+                        Make it engaging and strictly tailored to the requested marketing strategy and target audience.
+                        """
+                        try:
+                            # Gemini'ye fotoğrafları ve promptu gönder
+                            response = model.generate_content([specific_prompt] + images_for_ai)
+                            generated_text = response.text
+                            st.markdown(generated_text)
+                            
+                            st.download_button(
+                                label=f"📥 {t['download']} - {selected_tab}", 
+                                data=generated_text, 
+                                file_name=f"SarSa_{selected_tab.replace(' ', '_')}.txt", 
+                                key=f"dl_{idx}"
+                            )
+                        except Exception as e:
+                            st.error(f"AI Generation Error: {e}")
 else:
     st.markdown(f"""
     <div style='text-align:center;padding:3rem;background:#f8fafc;border-radius:12px;border:2px dashed #cbd5e1;margin-top:2rem;'>
