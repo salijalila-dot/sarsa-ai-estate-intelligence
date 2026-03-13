@@ -8,9 +8,30 @@ import uuid
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import streamlit.components.v1 as components  # ← FIX: needed for JS hash redirect
 
 # ─── PAGE CONFIG (En üstte olmalı) ────────────────────────────────────────────
 st.set_page_config(page_title="SarSa AI | Real Estate Intelligence", page_icon="🏢", layout="wide")
+
+# ─── HASH FRAGMENT → QUERY PARAM REDIRECT ─────────────────────────────────────
+# Supabase reset-password emails use implicit flow and put tokens in the URL
+# *hash* (#access_token=...&type=recovery).  Streamlit cannot read URL fragments
+# server-side, so we inject a tiny JS snippet that detects the fragment and
+# immediately redirects to the same URL using normal query params (?...) instead.
+# The page then reloads and Python can read the tokens via st.query_params.
+components.html("""
+<script>
+(function() {
+    var hash = window.location.hash;
+    if (hash && hash.length > 1) {
+        var params = new URLSearchParams(hash.substring(1));
+        if (params.get('access_token') || params.get('type') === 'recovery') {
+            window.location.replace(window.location.pathname + '?' + params.toString());
+        }
+    }
+})();
+</script>
+""", height=0)
 
 # ─── SUPABASE CONFIGURATION ───────────────────────────────────────────────────
 SUPABASE_URL: str = st.secrets["SUPABASE_URL"]
@@ -188,9 +209,26 @@ ui_languages = {
     "العربية": { "title": "SarSa AI | منصة الذكاء العقاري", "service_desc": "الذكاء البصري المتكامل للعقارات وأتمتة المبيعات العالمية", "subtitle": "حول صور العقارات فوراً إلى إعلانات مميزة، حقائب تواصل اجتماعي، سيناريوهات فيديو، مواصفات فنية، حملات بريدية ونصوص SEO.", "settings": "الإعدادات", "target_lang": "لغة الكتابة...", "prop_type": "نوع العقار", "price": "سعر السوق", "location": "الموقع", "tone": "استراتيجية التسويق", "tones": ["احترافي قياسي", "فخامة فائقة", "تركيز استثماري", "عصري بسيط", "حياة عائلية", "تأجير سياحي", "تجاري"], "ph_prop": "مثال: شقة 3+1، فيلا فاخرة...", "ph_price": "مثال: 850,000$ أو 2,500$ شهرياً...", "ph_loc": "مثال: دبي مارينا، الرياض، القاهرة...", "bedrooms": "غرف النوم", "bathrooms": "الحمامات", "area": "المساحة", "year_built": "سنة البناء", "ph_beds": "مثال: 3", "ph_baths": "مثال: 2", "ph_area": "مثال: 185 م²", "ph_year": "مثال: 2022", "furnishing": "حالة التأثيث", "furnishing_opts": ["غير محدد", "مفروش بالكامل", "مفروش جزئياً", "غير مفروش"], "target_audience": "الجمهور المستهدف", "audience_opts": ["السوق العام", "مشتري الفخامة", "المستثمرون", "المغتربون", "مشتري لأول مرة", "سوق العطلات", "مستأجر تجاري"], "custom_inst": "ملاحظات خاصة ومميزات", "custom_inst_ph": "مثال: مسبح خاص، إطلالة بانورامية، منزل ذكي...", "btn": "إنشاء الأصول المختارة", "upload_label": "ضع صور العقار هنا", "result": "معاينة تنفيذية", "loading": "جاري تجهيز منظومتك التسويقية الفاخرة...", "empty": "في انتظار الصور لبدء التحليل المهني. ارفع الصور واملأ التفاصيل على اليسار.", "download": "تصدير القسم (TXT)", "save_btn": "حفظ التغييرات", "saved_msg": "تم الحفظ!", "error": "خطأ:", "clear_btn": "إعادة تعيين", "select_sections": "اختر الأقسام المراد إنشاؤها", "tab_main": "الإعلان الرئيسي", "tab_social": "حقيبة التواصل", "tab_video": "سيناريو الفيديو", "tab_tech": "المواصفات الفنية", "tab_email": "حملة البريد", "tab_seo": "نصوص الويب وSEO", "tab_photo": "دليل التصوير", "label_main": "نص المبيعات", "label_social": "محتوى التواصل", "label_video": "سيناريو الفيديو", "label_tech": "المواصفات الفنية", "label_email": "حملة البريد الإلكتروني", "label_seo": "نص SEO", "label_photo": "توصيات التصوير الفوتوغرافي", "extra_details": "تفاصيل العقار الإضافية", "interface_lang": "لغة الواجهة", "logout": "تسجيل الخروج", "acc_settings": "إعدادات الحساب", "update_pw": "تحديث كلمة السر", "new_pw": "كلمة سر جديدة", "btn_update": "تحديث الآن", "danger_zone": "منطقة خطر", "delete_confirm": "أريد حذف حسابي نهائياً.", "btn_delete": "حذف الحساب", "pw_min_err": "يجب أن تكون 6 خانات على الأقل.", "delete_email_sent": "تم إرسال بريد التأكيد! تحقق من صندوق الوارد.", "delete_email_fail": "فشل إرسال البريد. تحقق من إعدادات SMTP." }
 }
 
+# ─── RECOVERY — Handle ?access_token= (implicit flow, converted from hash by JS)
+# FIX: Supabase reset emails use implicit flow (#access_token=...&type=recovery).
+# The JS snippet above converts the hash to query params so Python can read them.
+if "access_token" in query_params and query_params.get("type") == "recovery":
+    _at = query_params.get("access_token", "")
+    _rt = query_params.get("refresh_token", "")
+    if _at:
+        st.session_state.access_token  = _at
+        st.session_state.refresh_token = _rt
+        try:
+            supabase.auth.set_session(_at, _rt)
+        except Exception:
+            pass
+    st.session_state.recovery_mode = True
+    st.session_state.is_logged_in  = True
+    st.query_params.clear()
+    st.rerun()
+
 # ─── RECOVERY (PKCE) — Handle ?code= from Supabase reset email ────────────────
-# FIX: Tries both API signatures, extracts tokens from every possible response
-# shape, and always sets recovery_mode=True so the password form always shows.
+# Some Supabase versions / configurations use PKCE flow with a ?code= param.
 if "code" in query_params:
     _code_val = query_params["code"]
     _sess_data = None
@@ -204,7 +242,6 @@ if "code" in query_params:
         except Exception:
             break
 
-    # Try to pull access/refresh tokens from the response
     if _sess_data is not None:
         try:
             _s = getattr(_sess_data, 'session', None) or _sess_data
@@ -216,7 +253,6 @@ if "code" in query_params:
         except Exception:
             pass
 
-    # Fallback: read from live session if tokens not yet captured
     if not st.session_state.access_token:
         try:
             _live = supabase.auth.get_session()
@@ -460,15 +496,11 @@ with st.sidebar:
         st.divider()
 
         # ── Delete Account ─────────────────────────────────────────────────────
-        # FIX 1: session restored before get_user() — it no longer silently fails.
-        # FIX 2: send_delete_confirmation_email returns (bool, error_str) so the
-        #        exact SMTP error is shown in the UI for easy debugging.
         st.subheader(t["danger_zone"])
         confirm_del = st.checkbox(t["delete_confirm"])
         if st.button(f"❌ {t['btn_delete']}", type="primary", use_container_width=True):
             if confirm_del:
                 try:
-                    # ── restore session FIRST so get_user() never returns None ──
                     if st.session_state.access_token:
                         supabase.auth.set_session(
                             st.session_state.access_token,
