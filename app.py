@@ -109,12 +109,6 @@ def is_email_registered(email):
 # ─── QUERY PARAMS ─────────────────────────────────────────────────────────────
 qp = st.query_params
 
-# Error Handling for Verify Links
-if qp.get("error"):
-    error_msg = qp.get("error_description", qp.get("error"))
-    st.error(f"⚠️ Verification Error: {error_msg}. The link may have expired.")
-    st.query_params.clear()
-
 # Deletion confirm
 if qp.get("action") == "confirm_delete":
     token = qp.get("token","")
@@ -727,7 +721,7 @@ def _lang_sel(widget_key):
 # Streamlit reads query params natively — NO JavaScript needed.
 # ══════════════════════════════════════════════════════════════════════════════
 if qp.get("code"):
-    _code     = qp.get("code")
+    _code     = qp["code"]
     _flow_type = qp.get("type", "recovery")   # supabase includes type param with PKCE
     _sess_data = None
 
