@@ -14,25 +14,26 @@ import streamlit.components.v1 as components
 st.set_page_config(page_title="SarSa AI | Real Estate Intelligence", page_icon="🏢", layout="wide")
 
 # ─── HASH FRAGMENT → QUERY PARAM REDIRECT ─────────────────────────────────────
-# CRITICAL FIX: components.html renders inside an iframe, so window.location
-# refers to the iframe — NOT the parent page. We must use window.parent.location
-# to read the hash and redirect the actual Streamlit app URL.
-# Supabase puts tokens in the URL hash for both recovery and signup flows.
+# Supabase puts tokens in the URL hash for both recovery and signup flows (implicit flow).
+# This script reads the parent page hash and redirects with query params Streamlit can read.
 components.html("""
 <script>
 (function() {
     try {
-        var hash = window.parent.location.hash;
-        if (hash && hash.length > 1) {
-            var params = new URLSearchParams(hash.substring(1));
-            var type = params.get('type');
-            var hasToken = params.get('access_token');
-            if (hasToken || type === 'recovery' || type === 'signup') {
-                var newUrl = window.parent.location.pathname + '?' + params.toString();
-                window.parent.location.replace(newUrl);
-            }
+        var parentLoc = window.parent.location;
+        var hash = parentLoc.hash;
+        if (!hash || hash.length <= 1) return;
+        var params = new URLSearchParams(hash.substring(1));
+        var type = params.get('type');
+        var hasToken = params.get('access_token');
+        // Only redirect for auth flows we need to handle
+        if (hasToken && (type === 'recovery' || type === 'signup')) {
+            var newUrl = parentLoc.origin + parentLoc.pathname + '?' + params.toString();
+            window.parent.location.replace(newUrl);
         }
-    } catch(e) {}
+    } catch(e) {
+        console.warn('SarSa hash redirect error:', e);
+    }
 })();
 </script>
 """, height=0)
@@ -43,13 +44,14 @@ SUPABASE_KEY: str = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ─── SESSION STATE INITIALIZATION ─────────────────────────────────────────────
-if 'auth_lang'       not in st.session_state: st.session_state.auth_lang       = "English"
-if 'is_logged_in'    not in st.session_state: st.session_state.is_logged_in    = False
-if 'user_email'      not in st.session_state: st.session_state.user_email      = None
-if 'recovery_mode'   not in st.session_state: st.session_state.recovery_mode   = False
-if 'access_token'    not in st.session_state: st.session_state.access_token    = None
-if 'refresh_token'   not in st.session_state: st.session_state.refresh_token   = None
-if 'email_verified'  not in st.session_state: st.session_state.email_verified  = False
+if 'auth_lang'              not in st.session_state: st.session_state.auth_lang              = "English"
+if 'is_logged_in'           not in st.session_state: st.session_state.is_logged_in           = False
+if 'user_email'             not in st.session_state: st.session_state.user_email             = None
+if 'recovery_mode'          not in st.session_state: st.session_state.recovery_mode          = False
+if 'access_token'           not in st.session_state: st.session_state.access_token           = None
+if 'refresh_token'          not in st.session_state: st.session_state.refresh_token          = None
+if 'email_verified'         not in st.session_state: st.session_state.email_verified         = False
+if 'show_email_confirmed'   not in st.session_state: st.session_state.show_email_confirmed   = False  # NEW: dedicated confirmation page
 
 for key_name, val in [
     ("uretilen_ilan", ""), ("prop_type", ""), ("price", ""),
@@ -124,14 +126,12 @@ def send_delete_confirmation_email(to_email: str, confirm_token: str, cancel_tok
 
 # ─── HELPER: Check if email is registered ─────────────────────────────────────
 def is_email_registered(email: str) -> bool:
-    """Uses service key admin API to check if an email is already registered."""
     try:
         svc = create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_SERVICE_KEY"])
         users_resp = svc.auth.admin.list_users()
         registered = [u.email.lower() for u in users_resp if u.email]
         return email.lower().strip() in registered
     except Exception:
-        # If we can't check (e.g. no service key), allow sending to avoid blocking
         return True
 
 # ─── QUERY PARAM HANDLERS ─────────────────────────────────────────────────────
@@ -205,8 +205,10 @@ auth_texts = {
         "reset_success":"Password reset link sent! Check your inbox.",
         "reset_not_found":"No account found with this email address. Please register first.",
         "reset_invalid_email":"Please enter a valid email address.",
-        "email_verified_title":"✅ Email Verified Successfully!",
-        "email_verified_msg":"Your account has been confirmed. Please log in below to get started.",
+        "email_confirmed_title":"✅ Email Verified Successfully!",
+        "email_confirmed_msg":"Your SarSa AI account has been confirmed and is ready to use.",
+        "email_confirmed_sub":"Click the button below to go to the login page and get started.",
+        "email_confirmed_btn":"🔑 Go to Login",
         "pw_reset_title":"Set Your New Password",
         "pw_reset_desc":"Enter a new password for your account. You will be logged in automatically after saving.",
         "pw_reset_btn":"✅ Set Password & Login",
@@ -230,8 +232,10 @@ auth_texts = {
         "reset_success":"Şifre sıfırlama bağlantısı gönderildi! Gelen kutunuzu kontrol edin.",
         "reset_not_found":"Bu e-posta adresiyle kayıtlı hesap bulunamadı. Lütfen önce kayıt olun.",
         "reset_invalid_email":"Lütfen geçerli bir e-posta adresi girin.",
-        "email_verified_title":"✅ E-posta Başarıyla Doğrulandı!",
-        "email_verified_msg":"Hesabınız onaylandı. Devam etmek için aşağıdan giriş yapın.",
+        "email_confirmed_title":"✅ E-posta Başarıyla Doğrulandı!",
+        "email_confirmed_msg":"SarSa AI hesabınız onaylandı ve kullanıma hazır.",
+        "email_confirmed_sub":"Giriş sayfasına gitmek ve başlamak için aşağıdaki butona tıklayın.",
+        "email_confirmed_btn":"🔑 Giriş Sayfasına Git",
         "pw_reset_title":"Yeni Şifrenizi Belirleyin",
         "pw_reset_desc":"Hesabınız için yeni bir şifre girin. Kaydettikten sonra otomatik olarak giriş yapılacaksınız.",
         "pw_reset_btn":"✅ Şifreyi Kaydet ve Giriş Yap",
@@ -255,8 +259,10 @@ auth_texts = {
         "reset_success":"¡Enlace de restablecimiento enviado! Revisa tu bandeja.",
         "reset_not_found":"No se encontró ninguna cuenta con este correo. Por favor regístrate primero.",
         "reset_invalid_email":"Por favor ingresa un correo válido.",
-        "email_verified_title":"✅ ¡Email Verificado Exitosamente!",
-        "email_verified_msg":"Tu cuenta ha sido confirmada. Por favor inicia sesión abajo.",
+        "email_confirmed_title":"✅ ¡Email Verificado Exitosamente!",
+        "email_confirmed_msg":"Tu cuenta de SarSa AI ha sido confirmada y está lista para usar.",
+        "email_confirmed_sub":"Haz clic abajo para ir a la página de inicio de sesión.",
+        "email_confirmed_btn":"🔑 Ir al Login",
         "pw_reset_title":"Establece tu Nueva Contraseña",
         "pw_reset_desc":"Ingresa una nueva contraseña. Iniciarás sesión automáticamente al guardar.",
         "pw_reset_btn":"✅ Guardar Contraseña e Iniciar Sesión",
@@ -280,8 +286,10 @@ auth_texts = {
         "reset_success":"Link gesendet! Überprüfen Sie Ihren Posteingang.",
         "reset_not_found":"Kein Konto mit dieser E-Mail gefunden. Bitte zuerst registrieren.",
         "reset_invalid_email":"Bitte gültige E-Mail-Adresse eingeben.",
-        "email_verified_title":"✅ E-Mail erfolgreich verifiziert!",
-        "email_verified_msg":"Ihr Konto wurde bestätigt. Bitte melden Sie sich unten an.",
+        "email_confirmed_title":"✅ E-Mail erfolgreich verifiziert!",
+        "email_confirmed_msg":"Ihr SarSa AI-Konto wurde bestätigt und ist einsatzbereit.",
+        "email_confirmed_sub":"Klicken Sie unten, um zur Anmeldeseite zu gelangen.",
+        "email_confirmed_btn":"🔑 Zur Anmeldung",
         "pw_reset_title":"Neues Passwort festlegen",
         "pw_reset_desc":"Geben Sie ein neues Passwort ein. Sie werden automatisch eingeloggt.",
         "pw_reset_btn":"✅ Passwort speichern & einloggen",
@@ -305,8 +313,10 @@ auth_texts = {
         "reset_success":"Lien envoyé ! Vérifiez votre boîte de réception.",
         "reset_not_found":"Aucun compte trouvé avec cet email. Veuillez d'abord vous inscrire.",
         "reset_invalid_email":"Veuillez entrer une adresse email valide.",
-        "email_verified_title":"✅ Email vérifié avec succès !",
-        "email_verified_msg":"Votre compte a été confirmé. Veuillez vous connecter ci-dessous.",
+        "email_confirmed_title":"✅ Email vérifié avec succès !",
+        "email_confirmed_msg":"Votre compte SarSa AI a été confirmé et est prêt à l'emploi.",
+        "email_confirmed_sub":"Cliquez ci-dessous pour accéder à la page de connexion.",
+        "email_confirmed_btn":"🔑 Aller à la connexion",
         "pw_reset_title":"Définissez votre nouveau mot de passe",
         "pw_reset_desc":"Entrez un nouveau mot de passe. Vous serez connecté automatiquement après.",
         "pw_reset_btn":"✅ Enregistrer & Se connecter",
@@ -330,8 +340,10 @@ auth_texts = {
         "reset_success":"Link enviado! Verifique sua caixa de entrada.",
         "reset_not_found":"Nenhuma conta encontrada com este email. Por favor registe-se primeiro.",
         "reset_invalid_email":"Por favor insira um endereço de email válido.",
-        "email_verified_title":"✅ Email Verificado com Sucesso!",
-        "email_verified_msg":"Sua conta foi confirmada. Por favor faça login abaixo.",
+        "email_confirmed_title":"✅ Email Verificado com Sucesso!",
+        "email_confirmed_msg":"Sua conta SarSa AI foi confirmada e está pronta para uso.",
+        "email_confirmed_sub":"Clique abaixo para ir à página de login e começar.",
+        "email_confirmed_btn":"🔑 Ir para o Login",
         "pw_reset_title":"Defina sua Nova Senha",
         "pw_reset_desc":"Insira uma nova senha. Você será logado automaticamente após salvar.",
         "pw_reset_btn":"✅ Salvar Senha & Entrar",
@@ -355,8 +367,10 @@ auth_texts = {
         "reset_success":"リセットリンクを送信しました！受信トレイをご確認ください。",
         "reset_not_found":"このメールアドレスのアカウントが見つかりません。先に登録してください。",
         "reset_invalid_email":"有効なメールアドレスを入力してください。",
-        "email_verified_title":"✅ メールが正常に認証されました！",
-        "email_verified_msg":"アカウントが確認されました。下記からログインしてください。",
+        "email_confirmed_title":"✅ メールが正常に認証されました！",
+        "email_confirmed_msg":"SarSa AI アカウントが確認され、ご利用いただけます。",
+        "email_confirmed_sub":"下のボタンをクリックしてログインページに移動してください。",
+        "email_confirmed_btn":"🔑 ログインページへ",
         "pw_reset_title":"新しいパスワードを設定",
         "pw_reset_desc":"新しいパスワードを入力してください。保存後に自動的にログインされます。",
         "pw_reset_btn":"✅ パスワードを保存してログイン",
@@ -380,8 +394,10 @@ auth_texts = {
         "reset_success":"重置链接已发送！请检查您的邮箱。",
         "reset_not_found":"未找到使用此邮箱注册的账号，请先注册。",
         "reset_invalid_email":"请输入有效的电子邮件地址。",
-        "email_verified_title":"✅ 邮箱验证成功！",
-        "email_verified_msg":"您的账号已确认。请在下方登录以开始使用。",
+        "email_confirmed_title":"✅ 邮箱验证成功！",
+        "email_confirmed_msg":"您的 SarSa AI 账户已确认，可以开始使用。",
+        "email_confirmed_sub":"点击下方按钮前往登录页面开始使用。",
+        "email_confirmed_btn":"🔑 前往登录",
         "pw_reset_title":"设置您的新密码",
         "pw_reset_desc":"为您的账号输入新密码。保存后将自动登录。",
         "pw_reset_btn":"✅ 保存密码并登录",
@@ -405,8 +421,10 @@ auth_texts = {
         "reset_success":"تم إرسال رابط إعادة التعيين! تحقق من صندوق الوارد.",
         "reset_not_found":"لم يتم العثور على حساب بهذا البريد. يرجى التسجيل أولاً.",
         "reset_invalid_email":"يرجى إدخال عنوان بريد إلكتروني صالح.",
-        "email_verified_title":"✅ تم التحقق من البريد بنجاح!",
-        "email_verified_msg":"تم تأكيد حسابك. يرجى تسجيل الدخول أدناه للبدء.",
+        "email_confirmed_title":"✅ تم التحقق من البريد بنجاح!",
+        "email_confirmed_msg":"تم تأكيد حساب SarSa AI الخاص بك وهو جاهز للاستخدام.",
+        "email_confirmed_sub":"انقر على الزر أدناه للانتقال إلى صفحة تسجيل الدخول.",
+        "email_confirmed_btn":"🔑 الذهاب إلى تسجيل الدخول",
         "pw_reset_title":"تعيين كلمة المرور الجديدة",
         "pw_reset_desc":"أدخل كلمة مرور جديدة لحسابك. سيتم تسجيل دخولك تلقائياً بعد الحفظ.",
         "pw_reset_btn":"✅ حفظ كلمة المرور وتسجيل الدخول",
@@ -429,7 +447,28 @@ ui_languages = {
     "العربية": { "title": "SarSa AI | منصة الذكاء العقاري", "service_desc": "الذكاء البصري المتكامل للعقارات وأتمتة المبيعات العالمية", "subtitle": "حول صور العقارات فوراً إلى إعلانات مميزة، حقائب تواصل اجتماعي، سيناريوهات فيديو، مواصفات فنية، حملات بريدية ونصوص SEO.", "settings": "الإعدادات", "target_lang": "لغة الكتابة...", "prop_type": "نوع العقار", "price": "سعر السوق", "location": "الموقع", "tone": "استراتيجية التسويق", "tones": ["احترافي قياسي", "فخامة فائقة", "تركيز استثماري", "عصري بسيط", "حياة عائلية", "تأجير سياحي", "تجاري"], "ph_prop": "مثال: شقة 3+1، فيلا فاخرة...", "ph_price": "مثال: 850,000$ أو 2,500$ شهرياً...", "ph_loc": "مثال: دبي مارينا، الرياض، القاهرة...", "bedrooms": "غرف النوم", "bathrooms": "الحمامات", "area": "المساحة", "year_built": "سنة البناء", "ph_beds": "مثال: 3", "ph_baths": "مثال: 2", "ph_area": "مثال: 185 م²", "ph_year": "مثال: 2022", "furnishing": "حالة التأثيث", "furnishing_opts": ["غير محدد", "مفروش بالكامل", "مفروش جزئياً", "غير مفروش"], "target_audience": "الجمهور المستهدف", "audience_opts": ["السوق العام", "مشتري الفخامة", "المستثمرون", "المغتربون", "مشتري لأول مرة", "سوق العطلات", "مستأجر تجاري"], "custom_inst": "ملاحظات خاصة ومميزات", "custom_inst_ph": "مثال: مسبح خاص، إطلالة بانورامية، منزل ذكي...", "btn": "إنشاء الأصول المختارة", "upload_label": "ضع صور العقار هنا", "result": "معاينة تنفيذية", "loading": "جاري تجهيز منظومتك التسويقية الفاخرة...", "empty": "في انتظار الصور لبدء التحليل المهني. ارفع الصور واملأ التفاصيل على اليسار.", "download": "تصدير القسم (TXT)", "save_btn": "حفظ التغييرات", "saved_msg": "تم الحفظ!", "error": "خطأ:", "clear_btn": "إعادة تعيين", "select_sections": "اختر الأقسام المراد إنشاؤها", "tab_main": "الإعلان الرئيسي", "tab_social": "حقيبة التواصل", "tab_video": "سيناريو الفيديو", "tab_tech": "المواصفات الفنية", "tab_email": "حملة البريد", "tab_seo": "نصوص الويب وSEO", "tab_photo": "دليل التصوير", "label_main": "نص المبيعات", "label_social": "محتوى التواصل", "label_video": "سيناريو الفيديو", "label_tech": "المواصفات الفنية", "label_email": "حملة البريد الإلكتروني", "label_seo": "نص SEO", "label_photo": "توصيات التصوير الفوتوغرافي", "extra_details": "تفاصيل العقار الإضافية", "interface_lang": "لغة الواجهة", "logout": "تسجيل الخروج", "acc_settings": "إعدادات الحساب", "update_pw": "تحديث كلمة السر", "new_pw": "كلمة سر جديدة", "btn_update": "تحديث الآن", "danger_zone": "منطقة خطر", "delete_confirm": "أريد حذف حسابي نهائياً.", "btn_delete": "حذف الحساب", "pw_min_err": "يجب أن تكون 6 خانات على الأقل.", "delete_email_sent": "تم إرسال بريد التأكيد! تحقق من صندوق الوارد.", "delete_email_fail": "فشل إرسال البريد. تحقق من إعدادات SMTP." }
 }
 
+# ─── AUTH PAGE SHARED CSS ──────────────────────────────────────────────────────
+_auth_page_css = """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+html, body, [class*="st-"] { font-family: 'Plus Jakarta Sans', sans-serif !important; }
+.stApp { background: linear-gradient(135deg, #f0f4f8 0%, #e8edf5 100%) !important; }
+#MainMenu, footer, div[data-testid="stDecoration"] { display: none !important; }
+.block-container { max-width: 560px !important; margin: 2.5rem auto !important;
+    background: white; border-radius: 24px; padding: 3rem !important;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; }
+.stButton > button { background: #0f172a !important; color: white !important;
+    border-radius: 12px !important; padding: 14px 24px !important;
+    font-weight: 700 !important; font-size: 0.95rem !important; width: 100% !important;
+    border: none !important; transition: all 0.25s ease !important;
+    box-shadow: 0 4px 15px rgba(15,23,42,0.25) !important; }
+.stButton > button:hover { background: #1e293b !important; transform: translateY(-2px) !important;
+    box-shadow: 0 8px 25px rgba(15,23,42,0.35) !important; }
+</style>
+"""
+
 # ─── Handle: Email verification (type=signup) ─────────────────────────────────
+# FIX: Show dedicated "Email Confirmed" page instead of banner on login
 if "access_token" in query_params and query_params.get("type") == "signup":
     _at_signup = query_params.get("access_token", "")
     _rt_signup = query_params.get("refresh_token", "")
@@ -438,7 +477,8 @@ if "access_token" in query_params and query_params.get("type") == "signup":
             supabase.auth.set_session(_at_signup, _rt_signup)
         except Exception:
             pass
-    st.session_state.email_verified = True
+    st.session_state.show_email_confirmed = True   # ← NEW FLAG
+    st.session_state.email_verified = False         # clear old flag
     st.query_params.clear()
     st.rerun()
 
@@ -500,36 +540,83 @@ if "type" in query_params and query_params["type"] == "recovery":
     st.query_params.clear()
     st.rerun()
 
-# ─── RECOVERY FORM ────────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════════
+# ─── PAGE 1: EMAIL CONFIRMED — Dedicated full page (NEW) ─────────────────────
+# ═══════════════════════════════════════════════════════════════════════════════
+if st.session_state.get('show_email_confirmed'):
+    at = auth_texts.get(st.session_state.auth_lang, auth_texts["English"])
+    st.markdown(_auth_page_css, unsafe_allow_html=True)
+
+    # Language selector at top
+    def _update_lang_confirmed():
+        st.session_state.auth_lang = st.session_state._lang_confirmed
+    st.selectbox(
+        "🌐 Select Language / Dil Seçin",
+        list(auth_texts.keys()),
+        index=list(auth_texts.keys()).index(st.session_state.auth_lang) if st.session_state.auth_lang in auth_texts else 0,
+        key="_lang_confirmed", on_change=_update_lang_confirmed
+    )
+    at = auth_texts.get(st.session_state.auth_lang, auth_texts["English"])
+
+    st.markdown(f"""
+    <div style="text-align:center; padding: 1.5rem 0 2rem;">
+        <div style="font-size:5.5rem; line-height:1; margin-bottom:1.2rem;
+                    filter: drop-shadow(0 4px 12px rgba(34,197,94,0.3));">✅</div>
+        <h1 style="color:#0f172a; font-weight:800; font-size:2rem; margin:0 0 0.8rem;">
+            {at.get("email_confirmed_title","✅ Email Verified Successfully!")}
+        </h1>
+        <p style="color:#475569; font-size:1.05rem; line-height:1.7; margin:0 0 0.5rem;">
+            {at.get("email_confirmed_msg","Your account has been confirmed and is ready to use.")}
+        </p>
+        <p style="color:#94a3b8; font-size:0.92rem;">
+            {at.get("email_confirmed_sub","Click the button below to go to the login page.")}
+        </p>
+    </div>
+    <hr style="border:none; border-top:1px solid #f1f5f9; margin: 0 0 1.8rem;">
+    """, unsafe_allow_html=True)
+
+    col1, col2, col3 = st.columns([1, 3, 1])
+    with col2:
+        if st.button(at.get("email_confirmed_btn", "🔑 Go to Login"), use_container_width=True):
+            st.session_state.show_email_confirmed = False
+            st.rerun()
+
+    st.markdown("""
+    <p style="text-align:center; color:#cbd5e1; font-size:0.8rem; margin-top:2rem;">
+        SarSa AI | Real Estate Intelligence
+    </p>""", unsafe_allow_html=True)
+    st.stop()
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ─── PAGE 2: PASSWORD RECOVERY FORM ──────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════════
 if st.session_state.recovery_mode:
     _at_rec = auth_texts.get(st.session_state.auth_lang, auth_texts["English"])
-    st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
-    html, body, [class*="st-"] { font-family: 'Plus Jakarta Sans', sans-serif !important; }
-    .stApp { background-color: #f0f4f8 !important; }
-    #MainMenu, footer, div[data-testid="stDecoration"] { display: none !important; }
-    .block-container { max-width: 520px !important; margin: 3rem auto !important;
-        background: white; border-radius: 20px; padding: 2.5rem 3rem !important;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; }
-    .stButton > button { background: #0f172a !important; color: white !important;
-        border-radius: 12px !important; padding: 14px 24px !important;
-        font-weight: 700 !important; font-size: 0.95rem !important; width: 100% !important;
-        border: none !important; transition: all 0.25s ease !important;
-        box-shadow: 0 4px 15px rgba(15,23,42,0.3) !important; }
-    .stButton > button:hover { background: #1e293b !important; transform: translateY(-1px) !important; }
-    </style>""", unsafe_allow_html=True)
+    st.markdown(_auth_page_css, unsafe_allow_html=True)
+
+    # Language selector at top
+    def _update_lang_recovery():
+        st.session_state.auth_lang = st.session_state._lang_recovery
+    st.selectbox(
+        "🌐 Select Language / Dil Seçin",
+        list(auth_texts.keys()),
+        index=list(auth_texts.keys()).index(st.session_state.auth_lang) if st.session_state.auth_lang in auth_texts else 0,
+        key="_lang_recovery", on_change=_update_lang_recovery
+    )
+    _at_rec = auth_texts.get(st.session_state.auth_lang, auth_texts["English"])
 
     st.markdown(f"""
     <div style='text-align:center; padding:1rem 0 1.5rem;'>
       <div style='font-size:3.5rem; margin-bottom:0.6rem;'>🔒</div>
-      <h1 style='color:#0f172a; font-weight:800; font-size:1.7rem; margin:0;'>
+      <h1 style='color:#0f172a; font-weight:800; font-size:1.8rem; margin:0;'>
         {_at_rec.get("pw_reset_title","Set Your New Password")}
       </h1>
       <p style='color:#64748b; margin-top:0.6rem; font-size:0.97rem; line-height:1.6;'>
         {_at_rec.get("pw_reset_desc","Enter a new password for your account.")}
       </p>
-    </div>""", unsafe_allow_html=True)
+    </div>
+    <hr style="border:none; border-top:1px solid #f1f5f9; margin: 0 0 1.5rem;">
+    """, unsafe_allow_html=True)
 
     with st.form("recovery_form"):
         new_password_recovery = st.text_input(
@@ -620,9 +707,6 @@ h1 { color: #0f172a !important; font-weight: 800 !important; text-align: center;
 .stButton > button { background: #0f172a !important; color: white !important; border-radius: 12px !important; padding: 14px 24px !important; font-weight: 700 !important; font-size: 0.95rem !important; width: 100% !important; border: none !important; transition: all 0.25s ease !important; box-shadow: 0 4px 15px rgba(15,23,42,0.3) !important; letter-spacing: 0.3px !important; }
 .stButton > button:hover { background: #1e293b !important; box-shadow: 0 8px 25px rgba(15,23,42,0.4) !important; transform: translateY(-1px) !important; }
 .stTabs [aria-selected="true"] { background-color: #0f172a !important; color: white !important; border-radius: 8px 8px 0 0 !important; }
-.verified-banner { background: linear-gradient(135deg,#dcfce7,#bbf7d0); border: 1.5px solid #16a34a; border-radius: 14px; padding: 1.2rem 1.6rem; margin-bottom: 1.5rem; text-align: center; }
-.verified-banner h3 { color: #15803d; margin: 0 0 0.3rem; font-size: 1.1rem; font-weight: 800; }
-.verified-banner p  { color: #166534; margin: 0; font-size: 0.93rem; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -648,15 +732,6 @@ if auth_status != "paid":
     with col_text:
         st.markdown(f"<h1 style='text-align:left;color:#0f172a;font-weight:800;margin-top:0;padding-top:0;'>{at['welcome_title']}</h1>", unsafe_allow_html=True)
         st.markdown(f"<p style='font-size:1.15rem;color:#475569;font-weight:500;margin-bottom:2rem;'>{at['welcome_desc']}</p>", unsafe_allow_html=True)
-
-    # ── Email verified green banner ────────────────────────────────────────────
-    if st.session_state.email_verified:
-        st.markdown(f"""
-        <div class="verified-banner">
-          <h3>{at.get("email_verified_title","✅ Email Verified Successfully!")}</h3>
-          <p>{at.get("email_verified_msg","Your account has been confirmed. Please log in below.")}</p>
-        </div>""", unsafe_allow_html=True)
-        st.session_state.email_verified = False
 
     st.markdown(f"<h3 style='text-align:center;color:#0f172a;margin-bottom:1.5rem;'>{at['login_prompt']}</h3>", unsafe_allow_html=True)
 
@@ -708,11 +783,9 @@ if auth_status != "paid":
             email_reset = st.text_input(at["email"], placeholder="your@email.com")
             if st.form_submit_button(at["btn_reset"]):
                 email_reset = email_reset.strip()
-                # ── Validation ────────────────────────────────────────────────
                 if not email_reset or "@" not in email_reset:
                     st.error(at.get("reset_invalid_email", "Please enter a valid email address."))
                 else:
-                    # ── Check if email is registered ──────────────────────────
                     with st.spinner("Checking..."):
                         email_exists = is_email_registered(email_reset)
                     if not email_exists:
