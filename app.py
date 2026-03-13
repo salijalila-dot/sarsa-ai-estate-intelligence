@@ -1,5 +1,4 @@
 import streamlit as st
-import time
 from PIL import Image
 import google.generativeai as genai
 import os
@@ -10,33 +9,18 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-# Çerez (Cookie) yönetimi için (Sayfa yenilemelerinde hafıza)
-try:
-    import extra_streamlit_components as stx
-except ImportError:
-    stx = None
-    st.warning("Gelişmiş hafıza (çerez) özellikleri için terminalde 'pip install extra-streamlit-components' çalıştırın.")
-
 # ─── PAGE CONFIG ──────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="SarSa AI | Real Estate Intelligence",
     page_icon="🏢", layout="wide"
 )
 
-@st.cache_resource(experimental_allow_widgets=True)
-def get_cookie_manager():
-    if stx is not None:
-        return stx.CookieManager()
-    return None
-
-cookie_manager = get_cookie_manager()
-
 # ─── SUPABASE ─────────────────────────────────────────────────────────────────
 SUPABASE_URL: str = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY: str = st.secrets["SUPABASE_KEY"]
 supabase: Client  = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# ─── SESSION STATE & MEMORY ───────────────────────────────────────────────────
+# ─── SESSION STATE ────────────────────────────────────────────────────────────
 _defaults = {
     "auth_lang":            "English",
     "is_logged_in":         False,
@@ -51,32 +35,9 @@ _defaults = {
     "bathrooms":"", "area_size":"", "year_built":"",
     "furnishing_idx":0, "audience_idx":0, "selected_sections":[],
 }
-
 for k, v in _defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
-
-# Çerezlerden (Cookie) verileri al ve Session'a aktar (Sayfa Yenileme Koruması)
-if cookie_manager:
-    saved_lang = cookie_manager.get(cookie="sarsa_auth_lang")
-    if saved_lang and saved_lang != st.session_state.auth_lang:
-        st.session_state.auth_lang = saved_lang
-    
-    saved_access = cookie_manager.get(cookie="sarsa_access_token")
-    saved_refresh = cookie_manager.get(cookie="sarsa_refresh_token")
-    if saved_access and not st.session_state.access_token:
-        st.session_state.access_token = saved_access
-        st.session_state.refresh_token = saved_refresh
-
-def save_auth_cookies(access, refresh):
-    if cookie_manager:
-        cookie_manager.set("sarsa_access_token", access, expires_at=datetime.now() + timedelta(days=7))
-        cookie_manager.set("sarsa_refresh_token", refresh, expires_at=datetime.now() + timedelta(days=7))
-
-def clear_auth_cookies():
-    if cookie_manager:
-        cookie_manager.delete("sarsa_access_token")
-        cookie_manager.delete("sarsa_refresh_token")
 
 # ─── RESTORE PERSISTENT SESSION ───────────────────────────────────────────────
 if st.session_state.access_token and not st.session_state.is_logged_in:
@@ -91,7 +52,6 @@ if st.session_state.access_token and not st.session_state.is_logged_in:
         st.session_state.access_token  = None
         st.session_state.refresh_token = None
         st.session_state.is_logged_in  = False
-        clear_auth_cookies()
 
 # ─── EMAIL: ACCOUNT DELETION ──────────────────────────────────────────────────
 def send_delete_confirmation_email(to_email, confirm_token, cancel_token):
@@ -146,14 +106,16 @@ def is_email_registered(email):
     except Exception:
         return True
 
-# ─── QUERY PARAMS (ROUTING) ───────────────────────────────────────────────────
+# ─── QUERY PARAMS ─────────────────────────────────────────────────────────────
 qp = st.query_params
 
+# Error Handling for Verify Links
 if qp.get("error"):
     error_msg = qp.get("error_description", qp.get("error"))
     st.error(f"⚠️ Verification Error: {error_msg}. The link may have expired.")
     st.query_params.clear()
 
+# Deletion confirm
 if qp.get("action") == "confirm_delete":
     token = qp.get("token","")
     try:
@@ -170,7 +132,6 @@ if qp.get("action") == "confirm_delete":
                 supabase.table("pending_deletions").delete().eq("confirm_token",token).execute()
                 for k in ["is_logged_in","user_email","access_token","refresh_token"]:
                     st.session_state[k] = False if k=="is_logged_in" else None
-                clear_auth_cookies()
                 st.query_params.clear()
                 st.markdown("""<div style='text-align:center;padding:5rem 2rem;'>
                   <div style='font-size:5rem;'>👋</div>
@@ -179,6 +140,7 @@ if qp.get("action") == "confirm_delete":
                     Your SarSa AI account has been <strong>permanently deleted</strong>.<br>
                     All data removed.</p>
                   <p style='color:#94a3b8;margin-top:2rem;'>You have been logged out.</p>
+                  <p style='color:#cbd5e1;font-size:.85rem;margin-top:2rem;'>Thank you for using SarSa AI.</p>
                 </div>""", unsafe_allow_html=True)
                 st.stop()
             else:
@@ -188,6 +150,7 @@ if qp.get("action") == "confirm_delete":
     except Exception as e:
         st.error(f"Error: {e}"); st.stop()
 
+# Deletion cancel
 if qp.get("action") == "cancel_delete":
     try:
         supabase.table("pending_deletions").delete().eq("cancel_token",qp.get("token","")).execute()
@@ -195,77 +158,9 @@ if qp.get("action") == "cancel_delete":
         pass
     st.query_params.clear()
     st.success("Account deletion cancelled. Your account is safe! ✅")
-    time.sleep(2); st.rerun()
-
-# ══════════════════════════════════════════════════════════════════════════════
-# PKCE ?code= HANDLER — (TAMAMEN YENİLENMİŞ VE DROPPIN EKLENMİŞ BLOK)
-# ══════════════════════════════════════════════════════════════════════════════
-if qp.get("code"):
-    code = qp.get("code")
-    flow_type = qp.get("type", "recovery")
-
-    try:
-        # Koddan token alımı (explicit single-arg form)
-        resp = supabase.auth.exchange_code_for_session(code)
-    except Exception as e:
-        st.error(f"Auth exchange failed (Link expired or used): {e}")
-        st.query_params.clear()
-        time.sleep(2)
-        st.rerun()
-
-    access_token = None
-    refresh_token = None
-    try:
-        if isinstance(resp, dict):
-            sess = resp.get("data", {}).get("session") or resp.get("session") or resp.get("data")
-            if isinstance(sess, dict):
-                access_token = sess.get("access_token") or sess.get("accessToken")
-                refresh_token = sess.get("refresh_token") or sess.get("refreshToken")
-        else:
-            sess = getattr(resp, "session", None) or resp
-            access_token = getattr(sess, "access_token", None) or getattr(sess, "accessToken", None)
-            refresh_token = getattr(sess, "refresh_token", None) or getattr(sess, "refreshToken", None)
-    except Exception:
-        pass
-
-    if access_token:
-        try:
-            supabase.auth.set_session(access_token, refresh_token)
-            st.session_state.access_token = access_token
-            st.session_state.refresh_token = refresh_token
-            save_auth_cookies(access_token, refresh_token)
-        except Exception as e:
-            st.error(f"Could not set session after exchange: {e}")
-            st.query_params.clear()
-            st.stop()
-    else:
-        try:
-            gs = supabase.auth.get_session()
-            if isinstance(gs, dict):
-                sess = gs.get("data", {}).get("session") or gs.get("session") or gs.get("data")
-                if isinstance(sess, dict):
-                    st.session_state.access_token = sess.get("access_token")
-                    st.session_state.refresh_token = sess.get("refresh_token")
-            else:
-                st.session_state.access_token = getattr(gs, "access_token", None) or getattr(gs, "accessToken", None)
-                st.session_state.refresh_token = getattr(gs, "refresh_token", None) or getattr(gs, "refreshToken", None)
-        except Exception:
-            pass
-
-    st.query_params.clear()
-
-    # Yönlendirmeyi burada state üzerinden yapıyoruz
-    if flow_type == "signup":
-        st.session_state.show_email_confirmed = True
-        st.rerun()
-    else:
-        st.session_state.recovery_mode = True
-        if st.session_state.access_token:
-            st.session_state.is_logged_in = True
-        st.rerun()
+    import time; time.sleep(2); st.rerun()
 
 # ─── TEXT DICTS ───────────────────────────────────────────────────────────────
-# (Tüm dillerin buradadır, eksiltilmemiştir)
 auth_texts = {
     "English": {
         "login":"Login","register":"Register","email":"Email","password":"Password",
@@ -672,7 +567,7 @@ ui_languages = {
         "custom_inst":"Notas Especiais e Destaques","custom_inst_ph":"Ex: Piscina privativa, vista panorâmica, casa inteligente…",
         "btn":"GERAR ATIVOS SELECIONADOS","upload_label":"Enviar Fotos do Imóvel",
         "result":"Pré-visualização Executiva","loading":"Preparando seu ecossistema de marketing…",
-        "empty":"Aaguardando imagens. Envie fotos e preencha os detalhes à esquerda.",
+        "empty":"Aguardando imagens. Envie fotos e preencha os detalhes à esquerda.",
         "download":"Exportar Secção (TXT)","save_btn":"Salvar","saved_msg":"Salvo!",
         "error":"Erro:","clear_btn":"Limpar","select_sections":"Selecionar Seções",
         "tab_main":"Anúncio Premium","tab_social":"Kit Redes Sociais","tab_video":"Roteiros de Vídeo",
@@ -818,17 +713,69 @@ def _ut(key, fb=""):
     return ui_languages.get(st.session_state.auth_lang, ui_languages["English"]).get(key, fb)
 
 def _lang_sel(widget_key):
+    """Render language selector and rerun on change."""
     langs = list(auth_texts.keys())
     idx   = langs.index(st.session_state.auth_lang) if st.session_state.auth_lang in langs else 0
     sel   = st.selectbox("🌐 Select Language / Dil Seçin", langs, index=idx, key=widget_key)
     if sel != st.session_state.auth_lang:
         st.session_state.auth_lang = sel
-        if cookie_manager:
-            cookie_manager.set("sarsa_auth_lang", sel, expires_at=datetime.now() + timedelta(days=365))
         st.rerun()
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PAGE A — EMAIL CONFIRMED (KAYIT SONRASI ŞIK ONAY EKRANI)
+# ─── PKCE ?code= HANDLER  ← THE KEY FIX FOR BOTH RECOVERY & SIGNUP ──────────
+# Supabase PKCE flow redirects with ?code=XXX&type=recovery OR ?code=XXX&type=signup
+# Streamlit reads query params natively — NO JavaScript needed.
+# ══════════════════════════════════════════════════════════════════════════════
+if qp.get("code"):
+    _code     = qp.get("code")
+    _flow_type = qp.get("type", "recovery")   # supabase includes type param with PKCE
+    _sess_data = None
+
+    # Try to exchange the code for a real session
+    for _arg in [{"auth_code": _code}, _code]:
+        try:
+            _sess_data = supabase.auth.exchange_code_for_session(_arg)
+            break
+        except TypeError:
+            continue
+        except Exception:
+            break
+
+    if _sess_data:
+        try:
+            _s = getattr(_sess_data, "session", None) or _sess_data
+            _a = getattr(_s, "access_token", None)
+            _r = getattr(_s, "refresh_token", None)
+            if _a:
+                st.session_state.access_token  = _a
+                st.session_state.refresh_token = _r
+        except Exception:
+            pass
+
+    # Fallback: get live session if exchange didn't return tokens
+    if not st.session_state.access_token:
+        try:
+            _lv = supabase.auth.get_session()
+            if _lv:
+                st.session_state.access_token  = getattr(_lv, "access_token", None)
+                st.session_state.refresh_token = getattr(_lv, "refresh_token", None)
+        except Exception:
+            pass
+
+    st.query_params.clear()
+
+    # Route to correct page based on flow type
+    if _flow_type == "signup":
+        st.session_state.show_email_confirmed = True
+        st.rerun()
+    else:
+        # recovery (password reset) — or unknown default
+        st.session_state.recovery_mode = True
+        st.session_state.is_logged_in  = True
+        st.rerun()
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PAGE A — EMAIL CONFIRMED (after signup link click)
 # ══════════════════════════════════════════════════════════════════════════════
 if st.session_state.show_email_confirmed:
     st.markdown(_AUTH_CSS, unsafe_allow_html=True)
@@ -855,8 +802,6 @@ if st.session_state.show_email_confirmed:
     with c2:
         if st.button(_at("confirmed_btn","🔑 Go to Login"), use_container_width=True):
             st.session_state.show_email_confirmed = False
-            with st.spinner("Yönlendiriliyor..."):
-                time.sleep(1)
             st.rerun()
 
     st.markdown("""<p style="text-align:center;color:#cbd5e1;font-size:0.8rem;margin-top:1.5rem;">
@@ -864,7 +809,7 @@ if st.session_state.show_email_confirmed:
     st.stop()
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PAGE B — SET NEW PASSWORD (ŞİFRE SIFIRLAMA LİNKİNDEN GELEN ŞIK EKRAN)
+# PAGE B — SET NEW PASSWORD (after reset-password link click)
 # ══════════════════════════════════════════════════════════════════════════════
 if st.session_state.recovery_mode:
     st.markdown(_AUTH_CSS, unsafe_allow_html=True)
@@ -908,10 +853,9 @@ if st.session_state.recovery_mode:
                             st.session_state.refresh_token)
                     supabase.auth.update_user({"password": new_pw_val})
                     st.success(_at("pw_reset_success","✅ Password updated! Logging you in…"))
-                    
                     st.session_state.recovery_mode = False
                     st.session_state.is_logged_in  = True
-                    time.sleep(1.5)
+                    import time; time.sleep(1.5)
                     st.rerun()
                 except Exception as e:
                     st.error(f"Error updating password: {e}")
@@ -983,8 +927,6 @@ if auth_status != "paid":
         key="login_lang")
     if sel != st.session_state.auth_lang:
         st.session_state.auth_lang = sel
-        if cookie_manager:
-            cookie_manager.set("sarsa_auth_lang", sel, expires_at=datetime.now() + timedelta(days=365))
         st.rerun()
     at = auth_texts[st.session_state.auth_lang]
 
@@ -1014,7 +956,6 @@ if auth_status != "paid":
                     if r.session:
                         st.session_state.access_token  = r.session.access_token
                         st.session_state.refresh_token = r.session.refresh_token
-                        save_auth_cookies(r.session.access_token, r.session.refresh_token)
                     st.session_state.is_logged_in = True
                     st.session_state.user_email   = r.user.email
                     st.rerun()
@@ -1063,7 +1004,7 @@ if auth_status != "paid":
     st.stop()
 
 # ══════════════════════════════════════════════════════════════════════════════
-# AI + SIDEBAR (ANA UYGULAMA)
+# AI + SIDEBAR
 # ══════════════════════════════════════════════════════════════════════════════
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 model = genai.GenerativeModel("gemini-2.5-flash")
@@ -1085,8 +1026,6 @@ with st.sidebar:
                            all_ui, index=cur_idx, key="sb_lang")
     if sel_ui != st.session_state.auth_lang:
         st.session_state.auth_lang = sel_ui
-        if cookie_manager:
-            cookie_manager.set("sarsa_auth_lang", sel_ui, expires_at=datetime.now() + timedelta(days=365))
         st.rerun()
     t = ui_languages[st.session_state.auth_lang]
 
@@ -1127,12 +1066,9 @@ with st.sidebar:
             else: st.warning("Please tick the confirmation checkbox first.")
 
     if st.button(f"🚪 {t['logout']}", use_container_width=True):
-        with st.spinner("Çıkış yapılıyor..."):
-            supabase.auth.sign_out()
-            for k in ["is_logged_in","user_email","access_token","refresh_token"]:
-                st.session_state[k] = False if k=="is_logged_in" else None
-            clear_auth_cookies()
-            time.sleep(1)
+        supabase.auth.sign_out()
+        for k in ["is_logged_in","user_email","access_token","refresh_token"]:
+            st.session_state[k] = False if k=="is_logged_in" else None
         st.rerun()
 
     st.markdown("---")
