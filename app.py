@@ -8,19 +8,48 @@ import uuid
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import streamlit.components.v1 as components
+import time
 
 # ─── PAGE CONFIG (must be first) ──────────────────────────────────────────────
 st.set_page_config(page_title="SarSa AI | Real Estate Intelligence", page_icon="🏢", layout="wide")
+
+# ─── HASH FRAGMENT → QUERY PARAM REDIRECT (Geliştirildi) ──────────────────────
+components.html("""
+<script>
+(function() {
+    try {
+        var parentLoc = window.parent.location;
+        var hash = parentLoc.hash;
+        if (!hash || hash.length <= 1) return;
+        var hashParams = new URLSearchParams(hash.substring(1));
+        var type = hashParams.get('type');
+        var hasToken = hashParams.get('access_token');
+        if (hasToken && (type === 'recovery' || type === 'signup')) {
+            var currentParams = new URLSearchParams(parentLoc.search);
+            for (var pair of hashParams.entries()) {
+                currentParams.set(pair[0], pair[1]);
+            }
+            var newUrl = parentLoc.origin + parentLoc.pathname + '?' + currentParams.toString();
+            window.parent.location.replace(newUrl);
+        }
+    } catch(e) {
+        console.warn('SarSa hash redirect error:', e);
+    }
+})();
+</script>
+""", height=0)
 
 # ─── SUPABASE CONFIGURATION ───────────────────────────────────────────────────
 SUPABASE_URL: str = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY: str = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# ─── SESSION STATE & LANGUAGE PERSISTENCE INITIALIZATION ──────────────────────
-# Dil seçimini URL'den okuyarak başlatma (Sayfa yenilense de hatırlar)
-url_params = st.query_params
-initial_lang = url_params.get("lang", "English")
+# ─── SESSION STATE INITIALIZATION ─────────────────────────────────────────────
+query_params = st.query_params
+
+# URL'de dil parametresi varsa onu al, yoksa English olarak başlat (Hafıza özelliği)
+initial_lang = query_params.get("lang", "English")
 
 if 'auth_lang'              not in st.session_state: st.session_state.auth_lang              = initial_lang
 if 'is_logged_in'           not in st.session_state: st.session_state.is_logged_in           = False
@@ -39,29 +68,6 @@ for key_name, val in [
 ]:
     if key_name not in st.session_state:
         st.session_state[key_name] = val
-
-# ─── LANGUAGE HELPER ──────────────────────────────────────────────────────────
-lang_display = {
-    "English": "🇬🇧 English", "Türkçe": "🇹🇷 Türkçe", "Español": "🇪🇸 Español",
-    "Deutsch": "🇩🇪 Deutsch", "Français": "🇫🇷 Français", "Português": "🇵🇹 Português",
-    "日本語": "🇯🇵 日本語", "简体中文": "🇨🇳 简体中文", "العربية": "🇸🇦 العربية"
-}
-
-def update_lang():
-    # Seçilen dili session'a ve URL'e yaz, böylece refresh atılsa bile unutmaz
-    st.session_state.auth_lang = st.session_state._lang_selector
-    st.query_params["lang"] = st.session_state.auth_lang
-
-def language_selector_ui(key_name):
-    st.selectbox(
-        "Language",
-        options=list(lang_display.keys()),
-        format_func=lambda x: lang_display[x],
-        index=list(lang_display.keys()).index(st.session_state.auth_lang) if st.session_state.auth_lang in lang_display else 0,
-        key=key_name,
-        on_change=update_lang,
-        label_visibility="collapsed" # Sinir bozucu "Select Language" yazısını gizler
-    )
 
 # ─── EMAIL HELPER — Delete Confirmation ───────────────────────────────────────
 def send_delete_confirmation_email(to_email: str, confirm_token: str, cancel_token: str):
@@ -120,48 +126,63 @@ def is_email_registered(email: str) -> bool:
     except Exception:
         return True
 
-# ─── QUERY PARAM HANDLERS & ROUTING (OTP İLE GÜÇLENDİRİLDİ) ───────────────────
-action = url_params.get("action")
-
-# 1) Kayıt Onaylama (Signup Confirm)
-if action == "signup_confirm" and "token" in url_params and "email" in url_params:
+# ─── GLOBAL SESSION RESTORE (Ensures Auth Context is active) ──────────────────
+if st.session_state.access_token and st.session_state.refresh_token:
     try:
-        supabase.auth.verify_otp({
-            "email": url_params["email"],
-            "token": url_params["token"],
-            "type": "signup"
-        })
-        st.session_state.show_email_confirmed = True
-        st.session_state.is_logged_in = False
-        # Parametreleri temizle ki sayfa yenilenince tekrar tetiklenmesin, sadece dili tut
-        st.query_params.clear()
-        if st.session_state.auth_lang: st.query_params["lang"] = st.session_state.auth_lang
-        st.rerun()
+        supabase.auth.set_session(st.session_state.access_token, st.session_state.refresh_token)
     except Exception as e:
-        st.error(f"Verification link is invalid or expired: {e}")
+        pass # Ignore silently, token might be expired
 
-# 2) Şifre Sıfırlama (Reset Password)
-elif action == "reset_pw" and "token" in url_params and "email" in url_params:
+# ─── QUERY PARAM HANDLERS & ROUTING ───────────────────────────────────────────
+action = query_params.get("action")
+
+# 1) PKCE Flow & Code Exchange
+if "code" in query_params:
     try:
-        res = supabase.auth.verify_otp({
-            "email": url_params["email"],
-            "token": url_params["token"],
-            "type": "recovery"
-        })
-        st.session_state.recovery_mode = True
-        st.session_state.is_logged_in = True
-        if res and res.session:
+        res = supabase.auth.exchange_code_for_session({"auth_code": query_params["code"]})
+        if res and hasattr(res, 'session') and res.session:
             st.session_state.access_token = res.session.access_token
             st.session_state.refresh_token = res.session.refresh_token
-        st.query_params.clear()
-        if st.session_state.auth_lang: st.query_params["lang"] = st.session_state.auth_lang
-        st.rerun()
-    except Exception as e:
-        st.error(f"Recovery link is invalid or expired: {e}")
+            supabase.auth.set_session(res.session.access_token, res.session.refresh_token)
+    except Exception:
+        pass
 
-# 3) Hesap Silme Onayı
+# 2) Implicit Flow (Yedek - Hash fragment redirect üzerinden gelen)
+if "access_token" in query_params:
+    _at = query_params.get("access_token")
+    _rt = query_params.get("refresh_token")
+    if _at:
+        st.session_state.access_token = _at
+        st.session_state.refresh_token = _rt
+        try:
+            supabase.auth.set_session(_at, _rt)
+        except Exception:
+            pass
+
+# 3) Eylem (Action) Yönlendirmeleri
+if action == "signup_confirm" or query_params.get("type") == "signup":
+    st.session_state.show_email_confirmed = True
+    st.session_state.is_logged_in = False
+    
+    # URL'yi temizle ama dili koru
+    current_lang = st.session_state.auth_lang
+    st.query_params.clear()
+    st.query_params["lang"] = current_lang
+    st.rerun()
+
+elif action == "reset_pw" or query_params.get("type") == "recovery":
+    st.session_state.recovery_mode = True
+    st.session_state.is_logged_in = False
+    
+    # URL'yi temizle ama dili koru
+    current_lang = st.session_state.auth_lang
+    st.query_params.clear()
+    st.query_params["lang"] = current_lang
+    st.rerun()
+
+# 4) Hesap Silme Onayı
 elif action == "confirm_delete":
-    token = url_params.get("token", "")
+    token = query_params.get("token", "")
     try:
         result = supabase.table("pending_deletions").select("*").eq("confirm_token", token).execute()
         if result.data:
@@ -192,30 +213,28 @@ elif action == "confirm_delete":
                 </div>""", unsafe_allow_html=True)
                 st.stop()
             else:
-                st.error("This confirmation link has expired (24h limit).")
+                st.error("This confirmation link has expired (24h limit). Please request a new deletion from Account Settings.")
         else:
             st.error("Invalid or already used link.")
     except Exception as e:
         st.error(f"Error during account deletion: {e}")
     st.stop()
 
-# 4) Hesap Silme İptali
+# 5) Hesap Silme İptali
 elif action == "cancel_delete":
-    token = url_params.get("token", "")
+    token = query_params.get("token", "")
     try:
         supabase.table("pending_deletions").delete().eq("cancel_token", token).execute()
     except Exception:
         pass
     st.query_params.clear()
     st.success("Account deletion cancelled. Your account is completely safe!")
-    import time; time.sleep(2)
+    time.sleep(2)
     st.rerun()
 
-
-# ─── PERSISTENT SESSION RESTORE ───────────────────────────────────────────────
+# ─── PERSISTENT SESSION CHECK ─────────────────────────────────────────────────
 if st.session_state.access_token and not st.session_state.is_logged_in:
     try:
-        supabase.auth.set_session(st.session_state.access_token, st.session_state.refresh_token)
         _check = supabase.auth.get_user()
         if _check and _check.user:
             st.session_state.is_logged_in = True
@@ -253,6 +272,7 @@ auth_texts = {
         "pw_reset_success":"✅ Password updated successfully! Logging you in...",
         "pw_reset_min_err":"❌ Password must be at least 6 characters!",
         "new_pw_label":"New Password",
+        "lang_select_label": "🌐 Select Language"
     },
     "Türkçe": {
         "access":"SarSa AI Erişimi","login":"Giriş Yap","register":"Kayıt Ol",
@@ -280,6 +300,7 @@ auth_texts = {
         "pw_reset_success":"✅ Şifre başarıyla güncellendi! Giriş yapılıyor...",
         "pw_reset_min_err":"❌ Şifre en az 6 karakter olmalıdır!",
         "new_pw_label":"Yeni Şifre",
+        "lang_select_label": "🌐 Dil Seçin"
     },
     "Español": {
         "access":"Acceso a SarSa AI","login":"Iniciar Sesión","register":"Registrarse",
@@ -307,6 +328,7 @@ auth_texts = {
         "pw_reset_success":"✅ ¡Contraseña actualizada! Iniciando sesión...",
         "pw_reset_min_err":"❌ Mínimo 6 caracteres requeridos.",
         "new_pw_label":"Nueva Contraseña",
+        "lang_select_label": "🌐 Seleccionar Idioma"
     },
     "Deutsch": {
         "access":"SarSa AI Zugang","login":"Anmelden","register":"Registrieren",
@@ -334,6 +356,7 @@ auth_texts = {
         "pw_reset_success":"✅ Passwort aktualisiert! Einloggen...",
         "pw_reset_min_err":"❌ Mindestens 6 Zeichen erforderlich.",
         "new_pw_label":"Neues Passwort",
+        "lang_select_label": "🌐 Sprache Wählen"
     },
     "Français": {
         "access":"Accès SarSa AI","login":"Connexion","register":"S'inscrire",
@@ -361,6 +384,7 @@ auth_texts = {
         "pw_reset_success":"✅ Mot de passe mis à jour ! Connexion en cours...",
         "pw_reset_min_err":"❌ 6 caractères minimum.",
         "new_pw_label":"Nouveau mot de passe",
+        "lang_select_label": "🌐 Choisir la Langue"
     },
     "Português": {
         "access":"Acesso SarSa AI","login":"Entrar","register":"Registar",
@@ -388,6 +412,7 @@ auth_texts = {
         "pw_reset_success":"✅ Senha atualizada! Entrando...",
         "pw_reset_min_err":"❌ Mínimo de 6 caracteres.",
         "new_pw_label":"Nova Senha",
+        "lang_select_label": "🌐 Selecionar Idioma"
     },
     "日本語": {
         "access":"SarSa AI アクセス","login":"ログイン","register":"新規登録",
@@ -415,6 +440,7 @@ auth_texts = {
         "pw_reset_success":"✅ パスワードが更新されました！ログイン中...",
         "pw_reset_min_err":"❌ 6文字以上必要です。",
         "new_pw_label":"新しいパスワード",
+        "lang_select_label": "🌐 言語を選択"
     },
     "简体中文": {
         "access":"SarSa AI 访问","login":"登录","register":"注册",
@@ -442,6 +468,7 @@ auth_texts = {
         "pw_reset_success":"✅ 密码已更新！正在登录...",
         "pw_reset_min_err":"❌ 密码至少需要6位。",
         "new_pw_label":"新密码",
+        "lang_select_label": "🌐 选择语言"
     },
     "العربية": {
         "access":"دخول SarSa AI","login":"تسجيل الدخول","register":"إنشاء حساب",
@@ -469,6 +496,7 @@ auth_texts = {
         "pw_reset_success":"✅ تم تحديث كلمة المرور! جاري تسجيل الدخول...",
         "pw_reset_min_err":"❌ يجب أن تكون 6 خانات على الأقل.",
         "new_pw_label":"كلمة المرور الجديدة",
+        "lang_select_label": "🌐 اختر اللغة"
     }
 }
 
@@ -504,39 +532,47 @@ html, body, [class*="st-"] { font-family: 'Plus Jakarta Sans', sans-serif !impor
 </style>
 """
 
+# ─── LANGUAGE HELPER FUNCTION ─────────────────────────────────────────────────
+def update_lang_global(key):
+    st.session_state.auth_lang = st.session_state[key]
+    # Seçilen dili URL'e kaydet ki F5 yapılınca unutmasın
+    st.query_params["lang"] = st.session_state.auth_lang
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # ─── PAGE 1: EMAIL CONFIRMED — Dedicated full page ───────────────────────────
 # ═══════════════════════════════════════════════════════════════════════════════
 if st.session_state.get('show_email_confirmed'):
     at = auth_texts.get(st.session_state.auth_lang, auth_texts["English"])
     st.markdown(_auth_page_css, unsafe_allow_html=True)
-    
-    # Modern Language Selector
-    language_selector_ui("_lang_selector")
+
+    st.selectbox(
+        at.get("lang_select_label", "🌐 Select Language"),
+        list(auth_texts.keys()),
+        index=list(auth_texts.keys()).index(st.session_state.auth_lang) if st.session_state.auth_lang in auth_texts else 0,
+        key="_lang_confirmed", on_change=update_lang_global, args=("_lang_confirmed",)
+    )
     at = auth_texts.get(st.session_state.auth_lang, auth_texts["English"])
 
     st.markdown(f"""
     <div style="text-align:center; padding: 1.5rem 0 2rem;">
         <div style="font-size:5.5rem; line-height:1; margin-bottom:1.2rem;
                     filter: drop-shadow(0 4px 12px rgba(34,197,94,0.3));">✅</div>
-        <h1 style="color:#0f172a; font-weight:800; font-size:2rem; margin:0 0 0.8rem;">
+        <h1 style="color:#0f172a; font-weight:800; font-size:2.2rem; margin:0 0 0.8rem;">
             {at.get("email_confirmed_title","✅ Email Verified Successfully!")}
         </h1>
-        <p style="color:#475569; font-size:1.05rem; line-height:1.7; margin:0 0 0.5rem;">
+        <p style="color:#475569; font-size:1.1rem; line-height:1.7; margin:0 0 0.5rem;">
             {at.get("email_confirmed_msg","Your account has been confirmed and is ready to use.")}
         </p>
-        <p style="color:#94a3b8; font-size:0.92rem;">
+        <p style="color:#94a3b8; font-size:0.95rem;">
             {at.get("email_confirmed_sub","Click the button below to go to the login page.")}
         </p>
     </div>
     <hr style="border:none; border-top:1px solid #f1f5f9; margin: 0 0 1.8rem;">
     """, unsafe_allow_html=True)
 
-    col1, col2, col3 = st.columns([1, 3, 1])
-    with col2:
-        if st.button(at.get("email_confirmed_btn", "🔑 Go to Login"), use_container_width=True):
-            st.session_state.show_email_confirmed = False
-            st.rerun()
+    if st.button(at.get("email_confirmed_btn", "🔑 Go to Login"), use_container_width=True):
+        st.session_state.show_email_confirmed = False
+        st.rerun()
 
     st.markdown("""
     <p style="text-align:center; color:#cbd5e1; font-size:0.8rem; margin-top:2rem;">
@@ -551,8 +587,12 @@ if st.session_state.recovery_mode:
     _at_rec = auth_texts.get(st.session_state.auth_lang, auth_texts["English"])
     st.markdown(_auth_page_css, unsafe_allow_html=True)
 
-    # Modern Language Selector
-    language_selector_ui("_lang_selector")
+    st.selectbox(
+        _at_rec.get("lang_select_label", "🌐 Select Language"),
+        list(auth_texts.keys()),
+        index=list(auth_texts.keys()).index(st.session_state.auth_lang) if st.session_state.auth_lang in auth_texts else 0,
+        key="_lang_recovery", on_change=update_lang_global, args=("_lang_recovery",)
+    )
     _at_rec = auth_texts.get(st.session_state.auth_lang, auth_texts["English"])
 
     st.markdown(f"""
@@ -595,19 +635,21 @@ if st.session_state.recovery_mode:
                 st.error(_at_rec.get("pw_reset_min_err", "❌ Password must be at least 6 characters!"))
             else:
                 try:
+                    # En kritik kısım: Auth Session'ı force ediyoruz ki hata almayasın
                     if st.session_state.access_token:
                         supabase.auth.set_session(
                             st.session_state.access_token,
                             st.session_state.refresh_token
                         )
+                    
                     supabase.auth.update_user({"password": new_password_recovery})
                     st.success(_at_rec.get("pw_reset_success", "✅ Password updated! Logging you in..."))
                     st.session_state.recovery_mode = False
                     st.session_state.is_logged_in  = True
-                    import time; time.sleep(1.5)
+                    time.sleep(1.5)
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Error: {e}")
+                    st.error(f"Error updating password: {e} - Link might be expired.")
     st.stop()
 
 # ─── AUTH FUNCTIONS ────────────────────────────────────────────────────────────
@@ -615,11 +657,6 @@ def get_status():
     if st.session_state.get('is_logged_in'):
         return "paid", st.session_state.user_email
     try:
-        if st.session_state.access_token:
-            supabase.auth.set_session(
-                st.session_state.access_token,
-                st.session_state.refresh_token
-            )
         user_resp = supabase.auth.get_user()
         if not user_resp or not user_resp.user:
             return "logged_out", None
@@ -664,8 +701,13 @@ def load_logo(file_path):
 
 # ─── LOGIN / REGISTER SCREENS ─────────────────────────────────────────────────
 if auth_status != "paid":
-    # Modern Language Selector
-    language_selector_ui("_lang_selector")
+    at_temp = auth_texts.get(st.session_state.auth_lang, auth_texts["English"])
+    st.selectbox(
+        at_temp.get("lang_select_label", "🌐 Select Language"),
+        list(auth_texts.keys()),
+        index=list(auth_texts.keys()).index(st.session_state.auth_lang) if st.session_state.auth_lang in auth_texts else 0,
+        key="lang_selector", on_change=update_lang_global, args=("lang_selector",)
+    )
     at = auth_texts.get(st.session_state.auth_lang, auth_texts["English"])
 
     col_logo, col_text = st.columns([1, 6])
@@ -708,10 +750,10 @@ if auth_status != "paid":
             pw_reg    = st.text_input(at["password"] + " (Min 6)", type="password")
             if st.form_submit_button(at["btn_reg"]):
                 try:
-                    # OTP altyapısını sorunsuz kullanabilmek için standard sign_up yönlendirmesi
                     supabase.auth.sign_up({
                         "email": email_reg,
                         "password": pw_reg,
+                        "options": {"email_redirect_to": "https://sarsa-ai-estateintelligence.streamlit.app/?action=signup_confirm"}
                     })
                     st.success(f"✅ {at['success_reg']}")
                 except Exception as ex:
@@ -736,7 +778,10 @@ if auth_status != "paid":
                             "No account found with this email address. Please register first."))
                     else:
                         try:
-                            supabase.auth.reset_password_for_email(email_reset)
+                            supabase.auth.reset_password_for_email(
+                                email_reset,
+                                {"redirect_to": "https://sarsa-ai-estateintelligence.streamlit.app/?action=reset_pw"}
+                            )
                             st.success(f"✅ {at['reset_success']}")
                         except Exception as e:
                             st.error(f"Error: {e}")
@@ -757,15 +802,13 @@ with st.sidebar:
         st.markdown("<div style='text-align:center;padding:0.8rem 0 0.5rem;'><span style='font-size:1.8rem;font-weight:800;color:#0f172a;'>SarSa</span><span style='font-size:1.8rem;font-weight:800;background:linear-gradient(135deg,#3b82f6,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;'> AI</span></div>", unsafe_allow_html=True)
 
     st.divider()
-
-    # Sidebar Modern Language Selector
-    st.selectbox(
-        f"🌐 {ui_languages.get(st.session_state.auth_lang, ui_languages['English']).get('interface_lang','Interface Language')}",
-        options=list(lang_display.keys()),
-        format_func=lambda x: lang_display[x],
-        index=list(lang_display.keys()).index(st.session_state.auth_lang) if st.session_state.auth_lang in lang_display else 0,
-        key="_lang_selector",
-        on_change=update_lang
+    
+    at_side = auth_texts.get(st.session_state.auth_lang, auth_texts["English"])
+    current_ui_lang = st.selectbox(
+        at_side.get("lang_select_label", "🌐 Interface Language"),
+        list(ui_languages.keys()),
+        index=list(ui_languages.keys()).index(st.session_state.auth_lang) if st.session_state.auth_lang in ui_languages else 0,
+        key="ui_lang_sidebar", on_change=update_lang_global, args=("ui_lang_sidebar",)
     )
     t = ui_languages[st.session_state.auth_lang]
 
@@ -822,6 +865,7 @@ with st.sidebar:
         st.session_state.user_email    = None
         st.session_state.access_token  = None
         st.session_state.refresh_token = None
+        st.query_params.clear()
         st.rerun()
 
     st.markdown("---")
@@ -927,12 +971,4 @@ else:
       <h3 style='color:#475569;'>🏘️ {t.get('result','Executive Preview')}</h3>
       <p style='color:#94a3b8;'>{t['empty']}</p>
       <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:1.4rem;">
-        <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">📝 {t['tab_main']}</span>
-        <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">📱 {t['tab_social']}</span>
-        <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">🎬 {t['tab_video']}</span>
-        <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">⚙️ {t['tab_tech']}</span>
-        <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">✉️ {t['tab_email']}</span>
-        <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">🔍 {t['tab_seo']}</span>
-        <span style="background:#f1f5f9;color:#475569;font-size:0.73rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;">📸 {t.get('tab_photo','Photo Guide')}</span>
-      </div>
-    </div>""", unsafe_allow_html=True)
+        <span style="background:#f1f5f9;color:#4755
