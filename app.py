@@ -9,9 +9,13 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import streamlit.components.v1 as components
+from streamlit_cookies_controller import CookieController
 
 # ─── PAGE CONFIG (must be first) ──────────────────────────────────────────────
 st.set_page_config(page_title="SarSa AI | Real Estate Intelligence", page_icon="🏢", layout="wide")
+
+# ─── COOKIE CONTROLLER INITIALIZATION (Dil Hafızası İçin) ─────────────────────
+cookie_controller = CookieController()
 
 # ─── HASH FRAGMENT → QUERY PARAM REDIRECT (Geliştirildi) ──────────────────────
 # Hash parametrelerini mevcut query parametrelerini ezmeden birleştirir
@@ -46,7 +50,10 @@ SUPABASE_KEY: str = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ─── SESSION STATE INITIALIZATION ─────────────────────────────────────────────
-if 'auth_lang'              not in st.session_state: st.session_state.auth_lang              = "English"
+saved_lang = cookie_controller.get("sarsa_user_lang")
+default_lang = saved_lang if saved_lang else "English"
+
+if 'auth_lang'              not in st.session_state: st.session_state.auth_lang              = default_lang
 if 'is_logged_in'           not in st.session_state: st.session_state.is_logged_in           = False
 if 'user_email'             not in st.session_state: st.session_state.user_email             = None
 if 'recovery_mode'          not in st.session_state: st.session_state.recovery_mode          = False
@@ -126,7 +133,7 @@ def is_email_registered(email: str) -> bool:
 query_params = st.query_params
 action = query_params.get("action")
 
-# 1) PKCE Flow & Code Exchange (Şifre sıfırlama ve Doğrulama için)
+# 1) PKCE Flow & Code Exchange
 if "code" in query_params:
     try:
         res = supabase.auth.exchange_code_for_session({"auth_code": query_params["code"]})
@@ -136,26 +143,40 @@ if "code" in query_params:
     except Exception:
         pass
 
-# 2) Implicit Flow (Yedek)
+# 2) Implicit Flow (Yedek) - Şifre Sıfırlama ve Kayıt Doğrulama İçin Kritik
 if "access_token" in query_params:
     _at = query_params.get("access_token")
     _rt = query_params.get("refresh_token")
+    _type = query_params.get("type")
+    
     if _at:
         st.session_state.access_token = _at
         st.session_state.refresh_token = _rt
         try:
             supabase.auth.set_session(_at, _rt)
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"Session set error: {e}")
+            
+    if _type == "signup":
+        st.session_state.show_email_confirmed = True
+        st.session_state.is_logged_in = False
+        st.query_params.clear()
+        st.rerun()
+        
+    elif _type == "recovery":
+        st.session_state.recovery_mode = True
+        st.session_state.is_logged_in = True
+        st.query_params.clear()
+        st.rerun()
 
 # 3) Eylem (Action) Yönlendirmeleri
-if action == "signup_confirm" or query_params.get("type") == "signup":
+if action == "signup_confirm":
     st.session_state.show_email_confirmed = True
     st.session_state.is_logged_in = False
     st.query_params.clear()
     st.rerun()
 
-elif action == "reset_pw" or query_params.get("type") == "recovery":
+elif action == "reset_pw":
     st.session_state.recovery_mode = True
     st.session_state.is_logged_in = True
     st.query_params.clear()
@@ -246,10 +267,10 @@ auth_texts = {
         "reset_success":"Password reset link sent! Check your inbox.",
         "reset_not_found":"No account found with this email address. Please register first.",
         "reset_invalid_email":"Please enter a valid email address.",
-        "email_confirmed_title":"✅ Email Verified Successfully!",
-        "email_confirmed_msg":"Your SarSa AI account has been confirmed and is ready to use.",
-        "email_confirmed_sub":"Click the button below to go to the login page and get started.",
-        "email_confirmed_btn":"🔑 Go to Login",
+        "email_confirmed_title":"✅ Registration Confirmed!",
+        "email_confirmed_msg":"Your SarSa AI account has been verified and is ready to use.",
+        "email_confirmed_sub":"Click the button below to continue to the login page and access the platform.",
+        "email_confirmed_btn":"🔑 Continue to Login",
         "pw_reset_title":"Set Your New Password",
         "pw_reset_desc":"Enter a new password for your account. You will be logged in automatically after saving.",
         "pw_reset_btn":"✅ Set Password & Login",
@@ -273,10 +294,10 @@ auth_texts = {
         "reset_success":"Şifre sıfırlama bağlantısı gönderildi! Gelen kutunuzu kontrol edin.",
         "reset_not_found":"Bu e-posta adresiyle kayıtlı hesap bulunamadı. Lütfen önce kayıt olun.",
         "reset_invalid_email":"Lütfen geçerli bir e-posta adresi girin.",
-        "email_confirmed_title":"✅ E-posta Başarıyla Doğrulandı!",
-        "email_confirmed_msg":"SarSa AI hesabınız onaylandı ve kullanıma hazır.",
-        "email_confirmed_sub":"Giriş sayfasına gitmek ve başlamak için aşağıdaki butona tıklayın.",
-        "email_confirmed_btn":"🔑 Giriş Sayfasına Git",
+        "email_confirmed_title":"✅ Kaydınız Onaylandı!",
+        "email_confirmed_msg":"SarSa AI hesabınız başarıyla doğrulandı ve kullanıma hazır.",
+        "email_confirmed_sub":"Platforma erişmek ve giriş sayfasına devam etmek için aşağıdaki butona tıklayın.",
+        "email_confirmed_btn":"🔑 Giriş Sayfasına Devam Et",
         "pw_reset_title":"Yeni Şifrenizi Belirleyin",
         "pw_reset_desc":"Hesabınız için yeni bir şifre girin. Kaydettikten sonra otomatik olarak giriş yapılacaksınız.",
         "pw_reset_btn":"✅ Şifreyi Kaydet ve Giriş Yap",
@@ -300,10 +321,10 @@ auth_texts = {
         "reset_success":"¡Enlace de restablecimiento enviado! Revisa tu bandeja.",
         "reset_not_found":"No se encontró ninguna cuenta con este correo. Por favor regístrate primero.",
         "reset_invalid_email":"Por favor ingresa un correo válido.",
-        "email_confirmed_title":"✅ ¡Email Verificado Exitosamente!",
-        "email_confirmed_msg":"Tu cuenta de SarSa AI ha sido confirmada y está lista para usar.",
-        "email_confirmed_sub":"Haz clic abajo para ir a la página de inicio de sesión.",
-        "email_confirmed_btn":"🔑 Ir al Login",
+        "email_confirmed_title":"✅ ¡Registro Confirmado!",
+        "email_confirmed_msg":"Tu cuenta de SarSa AI ha sido verificada y está lista para usar.",
+        "email_confirmed_sub":"Haz clic en el botón de abajo para continuar a la página de inicio de sesión.",
+        "email_confirmed_btn":"🔑 Continuar al Login",
         "pw_reset_title":"Establece tu Nueva Contraseña",
         "pw_reset_desc":"Ingresa una nueva contraseña. Iniciarás sesión automáticamente al guardar.",
         "pw_reset_btn":"✅ Guardar Contraseña e Iniciar Sesión",
@@ -327,10 +348,10 @@ auth_texts = {
         "reset_success":"Link gesendet! Überprüfen Sie Ihren Posteingang.",
         "reset_not_found":"Kein Konto mit dieser E-Mail gefunden. Bitte zuerst registrieren.",
         "reset_invalid_email":"Bitte gültige E-Mail-Adresse eingeben.",
-        "email_confirmed_title":"✅ E-Mail erfolgreich verifiziert!",
-        "email_confirmed_msg":"Ihr SarSa AI-Konto wurde bestätigt und ist einsatzbereit.",
-        "email_confirmed_sub":"Klicken Sie unten, um zur Anmeldeseite zu gelangen.",
-        "email_confirmed_btn":"🔑 Zur Anmeldung",
+        "email_confirmed_title":"✅ Registrierung Bestätigt!",
+        "email_confirmed_msg":"Ihr SarSa AI-Konto wurde verifiziert und ist einsatzbereit.",
+        "email_confirmed_sub":"Klicken Sie unten, um zur Anmeldeseite fortzufahren.",
+        "email_confirmed_btn":"🔑 Weiter zur Anmeldung",
         "pw_reset_title":"Neues Passwort festlegen",
         "pw_reset_desc":"Geben Sie ein neues Passwort ein. Sie werden automatisch eingeloggt.",
         "pw_reset_btn":"✅ Passwort speichern & einloggen",
@@ -354,10 +375,10 @@ auth_texts = {
         "reset_success":"Lien envoyé ! Vérifiez votre boîte de réception.",
         "reset_not_found":"Aucun compte trouvé avec cet email. Veuillez d'abord vous inscrire.",
         "reset_invalid_email":"Veuillez entrer une adresse email valide.",
-        "email_confirmed_title":"✅ Email vérifié avec succès !",
-        "email_confirmed_msg":"Votre compte SarSa AI a été confirmé et est prêt à l'emploi.",
-        "email_confirmed_sub":"Cliquez ci-dessous pour accéder à la page de connexion.",
-        "email_confirmed_btn":"🔑 Aller à la connexion",
+        "email_confirmed_title":"✅ Inscription Confirmée !",
+        "email_confirmed_msg":"Votre compte SarSa AI a été vérifié et est prêt à l'emploi.",
+        "email_confirmed_sub":"Cliquez sur le bouton ci-dessous pour continuer vers la page de connexion.",
+        "email_confirmed_btn":"🔑 Continuer vers la Connexion",
         "pw_reset_title":"Définissez votre nouveau mot de passe",
         "pw_reset_desc":"Entrez un nouveau mot de passe. Vous serez connecté automatiquement après.",
         "pw_reset_btn":"✅ Enregistrer & Se connecter",
@@ -381,10 +402,10 @@ auth_texts = {
         "reset_success":"Link enviado! Verifique sua caixa de entrada.",
         "reset_not_found":"Nenhuma conta encontrada com este email. Por favor registe-se primeiro.",
         "reset_invalid_email":"Por favor insira um endereço de email válido.",
-        "email_confirmed_title":"✅ Email Verificado com Sucesso!",
-        "email_confirmed_msg":"Sua conta SarSa AI foi confirmada e está pronta para uso.",
-        "email_confirmed_sub":"Clique abaixo para ir à página de login e começar.",
-        "email_confirmed_btn":"🔑 Ir para o Login",
+        "email_confirmed_title":"✅ Registo Confirmado!",
+        "email_confirmed_msg":"Sua conta SarSa AI foi verificada e está pronta para uso.",
+        "email_confirmed_sub":"Clique no botão abaixo para continuar para a página de login.",
+        "email_confirmed_btn":"🔑 Continuar para Login",
         "pw_reset_title":"Defina sua Nova Senha",
         "pw_reset_desc":"Insira uma nova senha. Você será logado automaticamente após salvar.",
         "pw_reset_btn":"✅ Salvar Senha & Entrar",
@@ -408,10 +429,10 @@ auth_texts = {
         "reset_success":"リセットリンクを送信しました！受信トレイをご確認ください。",
         "reset_not_found":"このメールアドレスのアカウントが見つかりません。先に登録してください。",
         "reset_invalid_email":"有効なメールアドレスを入力してください。",
-        "email_confirmed_title":"✅ メールが正常に認証されました！",
-        "email_confirmed_msg":"SarSa AI アカウントが確認され、ご利用いただけます。",
-        "email_confirmed_sub":"下のボタンをクリックしてログインページに移動してください。",
-        "email_confirmed_btn":"🔑 ログインページへ",
+        "email_confirmed_title":"✅ 登録完了！",
+        "email_confirmed_msg":"SarSa AI アカウントの確認が完了し、利用可能になりました。",
+        "email_confirmed_sub":"下のボタンをクリックしてログインページに進んでください。",
+        "email_confirmed_btn":"🔑 ログインへ進む",
         "pw_reset_title":"新しいパスワードを設定",
         "pw_reset_desc":"新しいパスワードを入力してください。保存後に自動的にログインされます。",
         "pw_reset_btn":"✅ パスワードを保存してログイン",
@@ -435,10 +456,10 @@ auth_texts = {
         "reset_success":"重置链接已发送！请检查您的邮箱。",
         "reset_not_found":"未找到使用此邮箱注册的账号，请先注册。",
         "reset_invalid_email":"请输入有效的电子邮件地址。",
-        "email_confirmed_title":"✅ 邮箱验证成功！",
-        "email_confirmed_msg":"您的 SarSa AI 账户已确认，可以开始使用。",
-        "email_confirmed_sub":"点击下方按钮前往登录页面开始使用。",
-        "email_confirmed_btn":"🔑 前往登录",
+        "email_confirmed_title":"✅ 注册已确认！",
+        "email_confirmed_msg":"您的 SarSa AI 账户已验证，可以开始使用。",
+        "email_confirmed_sub":"点击下方按钮继续前往登录页面。",
+        "email_confirmed_btn":"🔑 继续前往登录",
         "pw_reset_title":"设置您的新密码",
         "pw_reset_desc":"为您的账号输入新密码。保存后将自动登录。",
         "pw_reset_btn":"✅ 保存密码并登录",
@@ -462,10 +483,10 @@ auth_texts = {
         "reset_success":"تم إرسال رابط إعادة التعيين! تحقق من صندوق الوارد.",
         "reset_not_found":"لم يتم العثور على حساب بهذا البريد. يرجى التسجيل أولاً.",
         "reset_invalid_email":"يرجى إدخال عنوان بريد إلكتروني صالح.",
-        "email_confirmed_title":"✅ تم التحقق من البريد بنجاح!",
-        "email_confirmed_msg":"تم تأكيد حساب SarSa AI الخاص بك وهو جاهز للاستخدام.",
-        "email_confirmed_sub":"انقر على الزر أدناه للانتقال إلى صفحة تسجيل الدخول.",
-        "email_confirmed_btn":"🔑 الذهاب إلى تسجيل الدخول",
+        "email_confirmed_title":"✅ تم تأكيد التسجيل!",
+        "email_confirmed_msg":"تم التحقق من حساب SarSa AI الخاص بك وهو جاهز للاستخدام.",
+        "email_confirmed_sub":"انقر على الزر أدناه للمتابعة إلى صفحة تسجيل الدخول.",
+        "email_confirmed_btn":"🔑 المتابعة لتسجيل الدخول",
         "pw_reset_title":"تعيين كلمة المرور الجديدة",
         "pw_reset_desc":"أدخل كلمة مرور جديدة لحسابك. سيتم تسجيل دخولك تلقائياً بعد الحفظ.",
         "pw_reset_btn":"✅ حفظ كلمة المرور وتسجيل الدخول",
@@ -517,6 +538,8 @@ if st.session_state.get('show_email_confirmed'):
 
     def _update_lang_confirmed():
         st.session_state.auth_lang = st.session_state._lang_confirmed
+        cookie_controller.set("sarsa_user_lang", st.session_state.auth_lang)
+        
     st.selectbox(
         "🌐 Select Language / Dil Seçin",
         list(auth_texts.keys()),
@@ -530,7 +553,7 @@ if st.session_state.get('show_email_confirmed'):
         <div style="font-size:5.5rem; line-height:1; margin-bottom:1.2rem;
                     filter: drop-shadow(0 4px 12px rgba(34,197,94,0.3));">✅</div>
         <h1 style="color:#0f172a; font-weight:800; font-size:2rem; margin:0 0 0.8rem;">
-            {at.get("email_confirmed_title","✅ Email Verified Successfully!")}
+            {at.get("email_confirmed_title","✅ Registration Confirmed!")}
         </h1>
         <p style="color:#475569; font-size:1.05rem; line-height:1.7; margin:0 0 0.5rem;">
             {at.get("email_confirmed_msg","Your account has been confirmed and is ready to use.")}
@@ -542,11 +565,9 @@ if st.session_state.get('show_email_confirmed'):
     <hr style="border:none; border-top:1px solid #f1f5f9; margin: 0 0 1.8rem;">
     """, unsafe_allow_html=True)
 
-    col1, col2, col3 = st.columns([1, 3, 1])
-    with col2:
-        if st.button(at.get("email_confirmed_btn", "🔑 Go to Login"), use_container_width=True):
-            st.session_state.show_email_confirmed = False
-            st.rerun()
+    if st.button(at.get("email_confirmed_btn", "🔑 Continue to Login"), use_container_width=True):
+        st.session_state.show_email_confirmed = False
+        st.rerun()
 
     st.markdown("""
     <p style="text-align:center; color:#cbd5e1; font-size:0.8rem; margin-top:2rem;">
@@ -563,6 +584,8 @@ if st.session_state.recovery_mode:
 
     def _update_lang_recovery():
         st.session_state.auth_lang = st.session_state._lang_recovery
+        cookie_controller.set("sarsa_user_lang", st.session_state.auth_lang)
+        
     st.selectbox(
         "🌐 Select Language / Dil Seçin",
         list(auth_texts.keys()),
@@ -650,6 +673,7 @@ def get_status():
 
 def update_lang():
     st.session_state.auth_lang = st.session_state.lang_selector
+    cookie_controller.set("sarsa_user_lang", st.session_state.auth_lang)
 
 auth_status, user_email = get_status()
 
@@ -734,7 +758,7 @@ if auth_status != "paid":
                     supabase.auth.sign_up({
                         "email": email_reg,
                         "password": pw_reg,
-                        "options": {"email_redirect_to": "https://sarsa-ai-estateintelligence.streamlit.app/?action=signup_confirm"}
+                        "options": {"email_redirect_to": "https://sarsa-ai-estateintelligence.streamlit.app/?type=signup"}
                     })
                     st.success(f"✅ {at['success_reg']}")
                 except Exception as ex:
@@ -761,7 +785,7 @@ if auth_status != "paid":
                         try:
                             supabase.auth.reset_password_for_email(
                                 email_reset,
-                                {"redirect_to": "https://sarsa-ai-estateintelligence.streamlit.app/?action=reset_pw"}
+                                {"redirect_to": "https://sarsa-ai-estateintelligence.streamlit.app/?type=recovery"}
                             )
                             st.success(f"✅ {at['reset_success']}")
                         except Exception as e:
@@ -790,7 +814,11 @@ with st.sidebar:
         index=list(ui_languages.keys()).index(st.session_state.auth_lang) if st.session_state.auth_lang in ui_languages else 0
     )
     t = ui_languages[current_ui_lang]
-    st.session_state.auth_lang = current_ui_lang
+    
+    if current_ui_lang != st.session_state.auth_lang:
+        st.session_state.auth_lang = current_ui_lang
+        cookie_controller.set("sarsa_user_lang", current_ui_lang)
+        st.rerun()
 
     with st.expander(f"⚙️ {t['acc_settings']}"):
         st.write(st.session_state.user_email)
