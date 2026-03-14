@@ -581,7 +581,7 @@ if st.session_state.get('show_email_confirmed'):
     st.stop()
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# ─── PAGE 2: PASSWORD RECOVERY FORM ──────────────────────────────────────────
+# ─── PAGE 2: PASSWORD RECOVERY FORM (FIXED) ───────────────────────────────────
 # ═══════════════════════════════════════════════════════════════════════════════
 if st.session_state.recovery_mode:
     _at_rec = auth_texts.get(st.session_state.auth_lang, auth_texts["English"])
@@ -627,7 +627,6 @@ if st.session_state.recovery_mode:
 
         if cancel_recovery:
             st.session_state.recovery_mode = False
-            st.session_state.is_logged_in  = False
             st.rerun()
 
         if submit_recovery:
@@ -635,22 +634,30 @@ if st.session_state.recovery_mode:
                 st.error(_at_rec.get("pw_reset_min_err", "❌ Password must be at least 6 characters!"))
             else:
                 try:
-                    # En kritik kısım: Auth Session'ı force ediyoruz ki hata almayasın
-                    if st.session_state.access_token:
-                        supabase.auth.set_session(
-                            st.session_state.access_token,
-                            st.session_state.refresh_token
-                        )
+                    # 1. Ensure we have the session from the URL params
+                    access_token = st.query_params.get("access_token") or st.session_state.access_token
+                    refresh_token = st.query_params.get("refresh_token") or st.session_state.refresh_token
                     
-                    supabase.auth.update_user({"password": new_password_recovery})
-                    st.success(_at_rec.get("pw_reset_success", "✅ Password updated! Logging you in..."))
-                    st.session_state.recovery_mode = False
-                    st.session_state.is_logged_in  = True
-                    time.sleep(1.5)
-                    st.rerun()
+                    if access_token:
+                        supabase.auth.set_session(access_token, refresh_token)
+                        
+                        # 2. Perform the update
+                        supabase.auth.update_user({"password": new_password_recovery})
+                        
+                        st.success(_at_rec.get("pw_reset_success", "✅ Password updated!"))
+                        st.session_state.recovery_mode = False
+                        st.session_state.is_logged_in = True
+                        time.sleep(1.5)
+                        st.rerun()
+                    else:
+                        st.error("Auth session missing. Please request a new reset link.")
+                        
+                except IndexError:
+                    st.error("Technical Error: The reset token is invalid or has already been used. Please request a new link.")
                 except Exception as e:
-                    st.error(f"Error updating password: {e} - Link might be expired.")
+                    st.error(f"Update failed: {str(e)}")
     st.stop()
+
 
 # ─── AUTH FUNCTIONS ────────────────────────────────────────────────────────────
 def get_status():
