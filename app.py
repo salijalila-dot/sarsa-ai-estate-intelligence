@@ -18,27 +18,20 @@ st.set_page_config(page_title="SarSa AI | Real Estate Intelligence", page_icon="
 components.html("""
 <script>
 (function() {
-    try {
-        var parentLoc = window.parent.location;
-        var hash = parentLoc.hash;
-        if (!hash || hash.length <= 1) return;
-        var hashParams = new URLSearchParams(hash.substring(1));
-        var type = hashParams.get('type');
-        var hasToken = hashParams.get('access_token');
-        if (hasToken && (type === 'recovery' || type === 'signup')) {
-            var currentParams = new URLSearchParams(parentLoc.search);
-            for (var pair of hashParams.entries()) {
-                currentParams.set(pair[0], pair[1]);
-            }
-            var newUrl = parentLoc.origin + parentLoc.pathname + '?' + currentParams.toString();
-            window.parent.location.replace(newUrl);
+    var hash = window.parent.location.hash;
+    if (hash && hash.includes('access_token')) {
+        // Hash'i query string'e çevir ama replace() yerine sadece pushState kullanmayı dene
+        // Veya daha iyisi: hash içeriğini bir değişkene al.
+        var newUrl = window.parent.location.origin + window.parent.location.pathname + '?' + hash.substring(1);
+        // Eğer zaten query parametresi yoksa yönlendir
+        if (!window.parent.location.search.includes('access_token')) {
+            window.parent.location.href = newUrl;
         }
-    } catch(e) {
-        console.warn('SarSa hash redirect error:', e);
     }
 })();
 </script>
 """, height=0)
+
 
 # ─── SUPABASE CONFIGURATION ───────────────────────────────────────────────────
 SUPABASE_URL: str = st.secrets["SUPABASE_URL"]
