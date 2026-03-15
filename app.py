@@ -627,8 +627,8 @@ if st.session_state.recovery_mode:
     """, unsafe_allow_html=True)
 
     with st.form("recovery_form"):
-    new_password_recovery = st.text_input("Yeni Şifre", type="password")
-    submit_recovery = st.form_submit_button("Şifreyi Güncelle")
+        new_password_recovery = st.text_input("Yeni Şifre", type="password")
+        submit_recovery = st.form_submit_button("Şifreyi Güncelle")
 
     if submit_recovery:
         # Token'ları güvenli depodan (session_state) alıyoruz
