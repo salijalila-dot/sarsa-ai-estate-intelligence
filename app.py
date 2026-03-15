@@ -14,8 +14,7 @@ import time
 # ─── PAGE CONFIG (must be first) ──────────────────────────────────────────────
 st.set_page_config(page_title="SarSa AI | Real Estate Intelligence", page_icon="🏢", layout="wide")
 
-# ─── HASH FRAGMENT → QUERY PARAM REDIRECT (Geliştirildi) ──────────────────────
-// ─── HASH FRAGMENT → QUERY PARAM REDIRECT (Güncellenmiş) ──────────────────────
+# ─── HASH FRAGMENT → QUERY PARAM REDIRECT (Güncellenmiş) ──────────────────────
 components.html("""
 <script>
 (function() {
