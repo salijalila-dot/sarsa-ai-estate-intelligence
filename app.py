@@ -15,22 +15,28 @@ import time
 st.set_page_config(page_title="SarSa AI | Real Estate Intelligence", page_icon="🏢", layout="wide")
 
 # ─── HASH FRAGMENT → QUERY PARAM REDIRECT (Geliştirildi) ──────────────────────
+// ─── HASH FRAGMENT → QUERY PARAM REDIRECT (Güncellenmiş) ──────────────────────
 components.html("""
 <script>
 (function() {
     var hash = window.parent.location.hash;
     if (hash && hash.includes('access_token')) {
-        // Hash'i query string'e çevir ama replace() yerine sadece pushState kullanmayı dene
-        // Veya daha iyisi: hash içeriğini bir değişkene al.
-        var newUrl = window.parent.location.origin + window.parent.location.pathname + '?' + hash.substring(1);
-        // Eğer zaten query parametresi yoksa yönlendir
-        if (!window.parent.location.search.includes('access_token')) {
+        var currentSearch = window.parent.location.search;
+        var hashQuery = hash.substring(1); // baştaki '#' işaretini at
+        
+        // Eğer URL'de halihazırda '?' varsa '&' ile ekle, yoksa '?' ile ekle
+        var separator = currentSearch ? '&' : '?';
+
+        // Eğer URL'de zaten access_token yoksa, hash'tekileri URL'e ekle ve yönlendir
+        if (!currentSearch.includes('access_token')) {
+            var newUrl = window.parent.location.origin + window.parent.location.pathname + currentSearch + separator + hashQuery;
             window.parent.location.href = newUrl;
         }
     }
 })();
 </script>
 """, height=0)
+
 
 
 # ─── SUPABASE CONFIGURATION ───────────────────────────────────────────────────
