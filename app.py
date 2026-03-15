@@ -602,7 +602,7 @@ if st.session_state.get('show_email_confirmed'):
 # ═══════════════════════════════════════════════════════════════════════════════
 # ─── PAGE 2: PASSWORD RECOVERY FORM (FIXED) ───────────────────────────────────
 # ═══════════════════════════════════════════════════════════════════════════════
-if st.session_state.recovery_mode:
+if st.session_state.get('recovery_mode'):
     _at_rec = auth_texts.get(st.session_state.auth_lang, auth_texts["English"])
     st.markdown(_auth_page_css, unsafe_allow_html=True)
 
@@ -628,39 +628,35 @@ if st.session_state.recovery_mode:
     """, unsafe_allow_html=True)
 
     with st.form("recovery_form"):
-        new_password_recovery = st.text_input("Yeni Şifre", type="password")
-        submit_recovery = st.form_submit_button("Şifreyi Güncelle")
+        new_password_recovery = st.text_input(_at_rec.get("new_pw_label", "New Password"), type="password")
+        submit_recovery = st.form_submit_button(_at_rec.get("pw_reset_btn", "✅ Set Password"))
 
-    if submit_recovery:
-        # Token'ları güvenli depodan (session_state) alıyoruz
-        at = st.session_state.get('access_token')
-        rt = st.session_state.get('refresh_token')
-st.stop()
+        if submit_recovery:
+            at = st.session_state.get('access_token')
+            rt = st.session_state.get('refresh_token')
 
-        if not at:
-            st.error("❌ Hata: Oturum verisi bulunamadı. Lütfen maildeki linke tekrar tıklayın.")
-            # Hata devam ediyorsa debug için: st.write(st.session_state) 
-        elif len(new_password_recovery) < 6:
-            st.error("❌ Şifre en az 6 karakter olmalı.")
-        else:
-            try:
-                # 1. Supabase'e bu token'larla giriş yap
-                supabase.auth.set_session(at, rt)
-                
-                # 2. Şifreyi güncelle
-                supabase.auth.update_user({"password": new_password_recovery})
-                
-                st.success("✅ Şifreniz başarıyla güncellendi! Giriş yapılıyor...")
-                
-                # 3. Temizlik
-                st.session_state.recovery_mode = False
-                st.session_state.access_token = None # İş bitince temizle
-                time.sleep(2)
-                st.rerun()
-            except Exception as e:
-                st.error(f"Güncelleme sırasında hata: {str(e)}")
+            if not at:
+                st.error("❌ Hata: Oturum verisi bulunamadı. Lütfen maildeki linke tekrar tıklayın.")
+            elif len(new_password_recovery) < 6:
+                st.error(_at_rec.get("pw_reset_min_err", "❌ Password must be at least 6 characters!"))
+            else:
+                try:
+                    # Supabase oturumunu bağla ve şifreyi güncelle
+                    supabase.auth.set_session(at, rt)
+                    supabase.auth.update_user({"password": new_password_recovery})
+                    
+                    st.success(_at_rec.get("pw_reset_success", "✅ Password updated!"))
+                    
+                    # Temizlik ve yönlendirme
+                    st.session_state.recovery_mode = False
+                    st.session_state.access_token = None
+                    time.sleep(2)
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error: {str(e)}")
 
-
+    # Giriş ekranının aşağıda çıkmaması için burayı kilitliyoruz
+    st.stop()
 
 
 # ─── AUTH FUNCTIONS ────────────────────────────────────────────────────────────
