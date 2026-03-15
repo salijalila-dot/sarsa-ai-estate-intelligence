@@ -174,18 +174,13 @@ if "access_token" in query_params:
 # 3) Eylem (Action) Yönlendirmeleri
 if action == "signup_confirm" or query_params.get("type") == "signup":
     st.session_state.show_email_confirmed = True
-    st.session_state.is_logged_in = False
-    st.query_params.clear()
     st.rerun()
 
 elif action == "reset_pw" or query_params.get("type") == "recovery":
-    # URL'den gelen tokenları al ve session'a kaydet (Çok Önemli)
-    if "access_token" in query_params:
-        st.session_state.access_token = query_params["access_token"]
-    if "refresh_token" in query_params:
-        st.session_state.refresh_token = query_params["refresh_token"]
-    
+    # BURADA URL TEMİZLEME VE RERUN YAPMA! 
+    # Sadece modu aktif et (zaten yukarıda ettik)
     st.session_state.recovery_mode = True
+
     st.session_state.is_logged_in = False
     st.rerun()
 
