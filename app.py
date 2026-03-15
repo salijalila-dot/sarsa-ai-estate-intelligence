@@ -626,7 +626,7 @@ if st.session_state.recovery_mode:
             st.session_state.recovery_mode = False
             st.rerun()
 
-                if submit_recovery:
+        if submit_recovery:
             if len(new_password_recovery) < 6:
                 st.error(_at_rec.get("pw_reset_min_err", "❌ Password must be at least 6 characters!"))
             else:
