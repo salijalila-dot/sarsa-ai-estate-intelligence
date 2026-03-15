@@ -44,6 +44,21 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # ─── SESSION STATE INITIALIZATION ─────────────────────────────────────────────
 query_params = st.query_params
 
+# --- TOKEN YAKALAMA (Kodun başında, query_params kısmında olmalı) ---
+if "access_token" in st.query_params:
+    st.session_state.access_token = st.query_params["access_token"]
+    st.session_state.recovery_mode = True  # Modu aktif et
+
+if "refresh_token" in st.query_params:
+    st.session_state.refresh_token = st.query_params["refresh_token"]
+
+# Eğer recovery modundaysak ama URL çok kalabalıksa temizleyelim 
+# (Sadece token'ları state'e aldıktan sonra)
+if st.session_state.get("recovery_mode") and "access_token" in st.query_params:
+    # URL'yi temizle ama state'i koru
+    st.query_params.clear()
+    st.rerun()
+
 # URL'de dil parametresi varsa onu al, yoksa English olarak başlat (Hafıza özelliği)
 initial_lang = query_params.get("lang", "English")
 
