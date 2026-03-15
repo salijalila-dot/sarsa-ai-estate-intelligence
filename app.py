@@ -36,8 +36,6 @@ components.html("""
 </script>
 """, height=0)
 
-
-
 # ─── SUPABASE CONFIGURATION ───────────────────────────────────────────────────
 SUPABASE_URL: str = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY: str = st.secrets["SUPABASE_KEY"]
@@ -231,7 +229,8 @@ elif action == "cancel_delete":
     st.rerun()
 
 # ─── PERSISTENT SESSION CHECK ─────────────────────────────────────────────────
-if st.session_state.access_token and not st.session_state.is_logged_in:
+# ÖNEMLİ DÜZELTME: recovery_mode içindeyken session check yapıp token'ları silmesini engelledik.
+if st.session_state.access_token and not st.session_state.is_logged_in and not st.session_state.recovery_mode:
     try:
         _check = supabase.auth.get_user()
         if _check and _check.user:
@@ -632,14 +631,11 @@ if st.session_state.recovery_mode:
                 st.error(_at_rec.get("pw_reset_min_err", "❌ Password must be at least 6 characters!"))
             else:
                 try:
-                    # 1. Ensure we have the session from the URL params
-                    access_token = st.query_params.get("access_token") or st.session_state.access_token
-                    refresh_token = st.query_params.get("refresh_token") or st.session_state.refresh_token
+                    # Session state'te tutulan token'ı kullanarak işlemi gerçekleştir
+                    access_token = st.session_state.access_token
                     
                     if access_token:
-                        supabase.auth.set_session(access_token, refresh_token)
-                        
-                        # 2. Perform the update
+                        # İşlem gerçekleştir
                         supabase.auth.update_user({"password": new_password_recovery})
                         
                         st.success(_at_rec.get("pw_reset_success", "✅ Password updated!"))
@@ -648,12 +644,15 @@ if st.session_state.recovery_mode:
                         time.sleep(1.5)
                         st.rerun()
                     else:
-                        st.error("Auth session missing. Please request a new reset link.")
+                        st.error("Auth session missing. Please request a new reset link from the login page.")
                         
-                except IndexError:
-                    st.error("Technical Error: The reset token is invalid or has already been used. Please request a new link.")
                 except Exception as e:
-                    st.error(f"Update failed: {str(e)}")
+                    # Sadece IndexError değil, anlamlı olan tüm hataları yakaladık
+                    error_msg = str(e).lower()
+                    if "invalid" in error_msg or "expired" in error_msg or "session" in error_msg:
+                        st.error("Technical Error: The reset token is invalid or has already been used. Please request a new link.")
+                    else:
+                        st.error(f"Update failed: {str(e)}")
     st.stop()
 
 
