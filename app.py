@@ -634,6 +634,7 @@ if st.session_state.recovery_mode:
         # Token'ları güvenli depodan (session_state) alıyoruz
         at = st.session_state.get('access_token')
         rt = st.session_state.get('refresh_token')
+st.stop()
 
         if not at:
             st.error("❌ Hata: Oturum verisi bulunamadı. Lütfen maildeki linke tekrar tıklayın.")
