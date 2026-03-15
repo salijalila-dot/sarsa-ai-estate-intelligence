@@ -11,36 +11,6 @@ from email.mime.multipart import MIMEMultipart
 import streamlit.components.v1 as components
 import time
 
-# ─── PAGE CONFIG (must be first) ──────────────────────────────────────────────
-st.set_page_config(page_title="SarSa AI | Real Estate Intelligence", page_icon="🏢", layout="wide")
-
-# ─── HASH FRAGMENT → QUERY PARAM REDIRECT (Güncellenmiş) ──────────────────────
-components.html("""
-<script>
-(function() {
-    var hash = window.parent.location.hash;
-    if (hash && hash.includes('access_token')) {
-        var currentSearch = window.parent.location.search;
-        var hashQuery = hash.substring(1); // baştaki '#' işaretini at
-        
-        // Eğer URL'de halihazırda '?' varsa '&' ile ekle, yoksa '?' ile ekle
-        var separator = currentSearch ? '&' : '?';
-
-        // Eğer URL'de zaten access_token yoksa, hash'tekileri URL'e ekle ve yönlendir
-        if (!currentSearch.includes('access_token')) {
-            var newUrl = window.parent.location.origin + window.parent.location.pathname + currentSearch + separator + hashQuery;
-            window.parent.location.href = newUrl;
-        }
-    }
-})();
-</script>
-""", height=0)
-
-# ─── SUPABASE CONFIGURATION ───────────────────────────────────────────────────
-SUPABASE_URL: str = st.secrets["SUPABASE_URL"]
-SUPABASE_KEY: str = st.secrets["SUPABASE_KEY"]
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-
 # ─── SESSION STATE INITIALIZATION ─────────────────────────────────────────────
 query_params = st.query_params
 
@@ -80,6 +50,36 @@ for key_name, val in [
 ]:
     if key_name not in st.session_state:
         st.session_state[key_name] = val
+
+# ─── PAGE CONFIG (must be first) ──────────────────────────────────────────────
+st.set_page_config(page_title="SarSa AI | Real Estate Intelligence", page_icon="🏢", layout="wide")
+
+# ─── HASH FRAGMENT → QUERY PARAM REDIRECT (Güncellenmiş) ──────────────────────
+components.html("""
+<script>
+(function() {
+    var hash = window.parent.location.hash;
+    if (hash && hash.includes('access_token')) {
+        var currentSearch = window.parent.location.search;
+        var hashQuery = hash.substring(1); // baştaki '#' işaretini at
+        
+        // Eğer URL'de halihazırda '?' varsa '&' ile ekle, yoksa '?' ile ekle
+        var separator = currentSearch ? '&' : '?';
+
+        // Eğer URL'de zaten access_token yoksa, hash'tekileri URL'e ekle ve yönlendir
+        if (!currentSearch.includes('access_token')) {
+            var newUrl = window.parent.location.origin + window.parent.location.pathname + currentSearch + separator + hashQuery;
+            window.parent.location.href = newUrl;
+        }
+    }
+})();
+</script>
+""", height=0)
+
+# ─── SUPABASE CONFIGURATION ───────────────────────────────────────────────────
+SUPABASE_URL: str = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY: str = st.secrets["SUPABASE_KEY"]
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ─── EMAIL HELPER — Delete Confirmation ───────────────────────────────────────
 def send_delete_confirmation_email(to_email: str, confirm_token: str, cancel_token: str):
