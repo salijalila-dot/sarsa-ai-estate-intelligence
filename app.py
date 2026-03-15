@@ -159,22 +159,28 @@ if "access_token" in query_params:
 if action == "signup_confirm" or query_params.get("type") == "signup":
     st.session_state.show_email_confirmed = True
     st.session_state.is_logged_in = False
-    
-    # URL'yi temizle ama dili koru
-    current_lang = st.session_state.auth_lang
     st.query_params.clear()
-    st.query_params["lang"] = current_lang
     st.rerun()
 
 elif action == "reset_pw" or query_params.get("type") == "recovery":
-    st.session_state.recovery_mode = True
-    st.session_state.is_logged_in = False
+    # URL'de token varsa ÖNCE onları session_state'e sağlama alalım
+    if "access_token" in st.query_params:
+        st.session_state.access_token = st.query_params["access_token"]
+    if "refresh_token" in st.query_params:
+        st.session_state.refresh_token = st.query_params["refresh_token"]
     
-    # URL'yi temizle ama dili koru
-    current_lang = st.session_state.auth_lang
-    st.query_params.clear()
-    st.query_params["lang"] = current_lang
-    st.rerun()
+    # Sadece token'ı aldıysak sayfayı temizleyip moda girelim
+    if st.session_state.access_token:
+        st.session_state.recovery_mode = True
+        st.session_state.is_logged_in = False
+        current_lang = st.session_state.auth_lang
+        st.query_params.clear()
+        st.query_params["lang"] = current_lang
+        st.rerun()
+    else:
+        # Eğer token yoksa ama reset_pw modundaysak, session_state'dekini kullanmaya devam et
+        st.session_state.recovery_mode = True
+
 
 # 4) Hesap Silme Onayı
 elif action == "confirm_delete":
