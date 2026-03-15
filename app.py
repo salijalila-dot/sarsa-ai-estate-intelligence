@@ -626,34 +626,44 @@ if st.session_state.recovery_mode:
             st.session_state.recovery_mode = False
             st.rerun()
 
-        if submit_recovery:
+                if submit_recovery:
             if len(new_password_recovery) < 6:
                 st.error(_at_rec.get("pw_reset_min_err", "❌ Password must be at least 6 characters!"))
             else:
                 try:
-                    # Session state'te tutulan token'ı kullanarak işlemi gerçekleştir
-                    access_token = st.session_state.access_token
+                    # 1. ÖNEMLİ: Önce session'ı manuel olarak tekrar doğrula
+                    # Hem access_token hem de refresh_token kullanmalısın
+                    access_token = st.session_state.get('access_token')
+                    refresh_token = st.session_state.get('refresh_token')
                     
                     if access_token:
-                        # İşlem gerçekleştir
-                        supabase.auth.update_user({"password": new_password_recovery})
+                        # Supabase'e bu tokenlarla oturum açtığını zorla söyle (JS'deki useEffect işi)
+                        supabase.auth.set_session(access_token, refresh_token)
                         
-                        st.success(_at_rec.get("pw_reset_success", "✅ Password updated!"))
-                        st.session_state.recovery_mode = False
-                        st.session_state.is_logged_in = True
-                        time.sleep(1.5)
-                        st.rerun()
+                        # 2. Şimdi şifreyi güncelle
+                        response = supabase.auth.update_user({"password": new_password_recovery})
+                        
+                        # Hata kontrolü (Supabase response içinde error dönebilir)
+                        if hasattr(response, 'error') and response.error:
+                            st.error(f"Hata: {response.error.message}")
+                        else:
+                            st.success(_at_rec.get("pw_reset_success", "✅ Password updated!"))
+                            st.session_state.recovery_mode = False
+                            st.session_state.is_logged_in = True
+                            # Bilgileri güncelle
+                            user_data = supabase.auth.get_user()
+                            st.session_state.user_email = user_data.user.email
+                            time.sleep(1.5)
+                            st.rerun()
                     else:
-                        st.error("Auth session missing. Please request a new reset link from the login page.")
+                        st.error("Auth session missing. Please request a new reset link.")
                         
                 except Exception as e:
-                    # Sadece IndexError değil, anlamlı olan tüm hataları yakaladık
                     error_msg = str(e).lower()
-                    if "invalid" in error_msg or "expired" in error_msg or "session" in error_msg:
-                        st.error("Technical Error: The reset token is invalid or has already been used. Please request a new link.")
+                    if "invalid" in error_msg or "expired" in error_msg:
+                        st.error("Technical Error: Link invalid or expired.")
                     else:
                         st.error(f"Update failed: {str(e)}")
-    st.stop()
 
 
 # ─── AUTH FUNCTIONS ────────────────────────────────────────────────────────────
