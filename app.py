@@ -179,6 +179,18 @@ if action == "signup_confirm" or query_params.get("type") == "signup":
     st.rerun()
 
 elif action == "reset_pw" or query_params.get("type") == "recovery":
+    # URL'den gelen tokenları al ve session'a kaydet (Çok Önemli)
+    if "access_token" in query_params:
+        st.session_state.access_token = query_params["access_token"]
+    if "refresh_token" in query_params:
+        st.session_state.refresh_token = query_params["refresh_token"]
+    
+    st.session_state.recovery_mode = True
+    st.session_state.is_logged_in = False
+    st.rerun()
+
+
+elif action == "reset_pw" or query_params.get("type") == "recovery":
     # URL'de token varsa ÖNCE onları session_state'e sağlama alalım
     if "access_token" in st.query_params:
         st.session_state.access_token = st.query_params["access_token"]
