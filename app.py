@@ -9,36 +9,50 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import streamlit.components.v1 as components
-import time
+
+# ─── PAGE CONFIG (must be first) ──────────────────────────────────────────────
+st.set_page_config(page_title="SarSa AI | Real Estate Intelligence", page_icon="🏢", layout="wide")
+
+# ─── HASH FRAGMENT → QUERY PARAM REDIRECT (Geliştirildi) ──────────────────────
+# Hash parametrelerini mevcut query parametrelerini ezmeden birleştirir
+components.html("""
+<script>
+(function() {
+    try {
+        var parentLoc = window.parent.location;
+        var hash = parentLoc.hash;
+        if (!hash || hash.length <= 1) return;
+        var hashParams = new URLSearchParams(hash.substring(1));
+        var type = hashParams.get('type');
+        var hasToken = hashParams.get('access_token');
+        if (hasToken && (type === 'recovery' || type === 'signup')) {
+            var currentParams = new URLSearchParams(parentLoc.search);
+            for (var pair of hashParams.entries()) {
+                currentParams.set(pair[0], pair[1]);
+            }
+            var newUrl = parentLoc.origin + parentLoc.pathname + '?' + currentParams.toString();
+            window.parent.location.replace(newUrl);
+        }
+    } catch(e) {
+        console.warn('SarSa hash redirect error:', e);
+    }
+})();
+</script>
+""", height=0)
+
+# ─── SUPABASE CONFIGURATION ───────────────────────────────────────────────────
+SUPABASE_URL: str = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY: str = st.secrets["SUPABASE_KEY"]
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ─── SESSION STATE INITIALIZATION ─────────────────────────────────────────────
-query_params = st.query_params
-
-# --- TOKEN VE MOD YAKALAMA (Kodun başında) ---
-if "access_token" in st.query_params:
-    st.session_state.access_token = st.query_params["access_token"]
-    # Eğer URL'de 'recovery' veya 'reset_pw' geçiyorsa modu aktif et
-    if st.query_params.get("type") == "recovery" or st.query_params.get("action") == "reset_pw":
-        st.session_state.recovery_mode = True
-
-if "refresh_token" in st.query_params:
-    st.session_state.refresh_token = st.query_params["refresh_token"]
-
-# URL temizleme: Sadece token'ları state'e aldığımız ilk seferde yapalım
-if st.session_state.get("recovery_mode") and "access_token" in st.query_params:
-    st.query_params.clear()
-    st.rerun()
-
-
-# URL'de dil parametresi varsa onu al, yoksa English olarak başlat (Hafıza özelliği)
-initial_lang = query_params.get("lang", "English")
-
-if 'auth_lang'              not in st.session_state: st.session_state.auth_lang              = initial_lang
+if 'auth_lang'              not in st.session_state: st.session_state.auth_lang              = "English"
 if 'is_logged_in'           not in st.session_state: st.session_state.is_logged_in           = False
 if 'user_email'             not in st.session_state: st.session_state.user_email             = None
 if 'recovery_mode'          not in st.session_state: st.session_state.recovery_mode          = False
 if 'access_token'           not in st.session_state: st.session_state.access_token           = None
 if 'refresh_token'          not in st.session_state: st.session_state.refresh_token          = None
+if 'email_verified'         not in st.session_state: st.session_state.email_verified         = False
 if 'show_email_confirmed'   not in st.session_state: st.session_state.show_email_confirmed   = False  
 
 for key_name, val in [
@@ -50,36 +64,6 @@ for key_name, val in [
 ]:
     if key_name not in st.session_state:
         st.session_state[key_name] = val
-
-# ─── PAGE CONFIG (must be first) ──────────────────────────────────────────────
-st.set_page_config(page_title="SarSa AI | Real Estate Intelligence", page_icon="🏢", layout="wide")
-
-# ─── HASH FRAGMENT → QUERY PARAM REDIRECT (Güncellenmiş) ──────────────────────
-components.html("""
-<script>
-(function() {
-    var hash = window.parent.location.hash;
-    if (hash && hash.includes('access_token')) {
-        var currentSearch = window.parent.location.search;
-        var hashQuery = hash.substring(1); // baştaki '#' işaretini at
-        
-        // Eğer URL'de halihazırda '?' varsa '&' ile ekle, yoksa '?' ile ekle
-        var separator = currentSearch ? '&' : '?';
-
-        // Eğer URL'de zaten access_token yoksa, hash'tekileri URL'e ekle ve yönlendir
-        if (!currentSearch.includes('access_token')) {
-            var newUrl = window.parent.location.origin + window.parent.location.pathname + currentSearch + separator + hashQuery;
-            window.parent.location.href = newUrl;
-        }
-    }
-})();
-</script>
-""", height=0)
-
-# ─── SUPABASE CONFIGURATION ───────────────────────────────────────────────────
-SUPABASE_URL: str = st.secrets["SUPABASE_URL"]
-SUPABASE_KEY: str = st.secrets["SUPABASE_KEY"]
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ─── EMAIL HELPER — Delete Confirmation ───────────────────────────────────────
 def send_delete_confirmation_email(to_email: str, confirm_token: str, cancel_token: str):
@@ -138,28 +122,21 @@ def is_email_registered(email: str) -> bool:
     except Exception:
         return True
 
-# ─── GLOBAL SESSION RESTORE (Ensures Auth Context is active) ──────────────────
-if st.session_state.access_token and st.session_state.refresh_token:
-    try:
-        supabase.auth.set_session(st.session_state.access_token, st.session_state.refresh_token)
-    except Exception as e:
-        pass # Ignore silently, token might be expired
-
 # ─── QUERY PARAM HANDLERS & ROUTING ───────────────────────────────────────────
+query_params = st.query_params
 action = query_params.get("action")
 
-# 1) PKCE Flow & Code Exchange
+# 1) PKCE Flow & Code Exchange (Şifre sıfırlama ve Doğrulama için)
 if "code" in query_params:
     try:
         res = supabase.auth.exchange_code_for_session({"auth_code": query_params["code"]})
         if res and hasattr(res, 'session') and res.session:
             st.session_state.access_token = res.session.access_token
             st.session_state.refresh_token = res.session.refresh_token
-            supabase.auth.set_session(res.session.access_token, res.session.refresh_token)
     except Exception:
         pass
 
-# 2) Implicit Flow (Yedek - Hash fragment redirect üzerinden gelen)
+# 2) Implicit Flow (Yedek)
 if "access_token" in query_params:
     _at = query_params.get("access_token")
     _rt = query_params.get("refresh_token")
@@ -174,36 +151,15 @@ if "access_token" in query_params:
 # 3) Eylem (Action) Yönlendirmeleri
 if action == "signup_confirm" or query_params.get("type") == "signup":
     st.session_state.show_email_confirmed = True
-    st.rerun()
-
-elif action == "reset_pw" or query_params.get("type") == "recovery":
-    # BURADA URL TEMİZLEME VE RERUN YAPMA! 
-    # Sadece modu aktif et (zaten yukarıda ettik)
-    st.session_state.recovery_mode = True
-
     st.session_state.is_logged_in = False
+    st.query_params.clear()
     st.rerun()
 
-
 elif action == "reset_pw" or query_params.get("type") == "recovery":
-    # URL'de token varsa ÖNCE onları session_state'e sağlama alalım
-    if "access_token" in st.query_params:
-        st.session_state.access_token = st.query_params["access_token"]
-    if "refresh_token" in st.query_params:
-        st.session_state.refresh_token = st.query_params["refresh_token"]
-    
-    # Sadece token'ı aldıysak sayfayı temizleyip moda girelim
-    if st.session_state.access_token:
-        st.session_state.recovery_mode = True
-        st.session_state.is_logged_in = False
-        current_lang = st.session_state.auth_lang
-        st.query_params.clear()
-        st.query_params["lang"] = current_lang
-        st.rerun()
-    else:
-        # Eğer token yoksa ama reset_pw modundaysak, session_state'dekini kullanmaya devam et
-        st.session_state.recovery_mode = True
-
+    st.session_state.recovery_mode = True
+    st.session_state.is_logged_in = True
+    st.query_params.clear()
+    st.rerun()
 
 # 4) Hesap Silme Onayı
 elif action == "confirm_delete":
@@ -220,6 +176,7 @@ elif action == "confirm_delete":
                 except Exception:
                     pass 
                 
+                # Her halükarda kullanılmış token veritabanından silinir
                 supabase.table("pending_deletions").delete().eq("confirm_token", token).execute()
                 
                 for _k in ["is_logged_in","user_email","access_token","refresh_token"]:
@@ -235,6 +192,8 @@ elif action == "confirm_delete":
                     All your data has been removed from our systems.
                   </p>
                   <p style='color:#94a3b8;margin-top:2rem;font-size:0.95rem;'>You have been logged out.</p>
+                  <hr style='border:none;border-top:1px solid #e2e8f0;margin:2.5rem auto;max-width:400px;'>
+                  <p style='color:#cbd5e1;font-size:0.85rem;'>Thank you for using SarSa AI.</p>
                 </div>""", unsafe_allow_html=True)
                 st.stop()
             else:
@@ -254,13 +213,13 @@ elif action == "cancel_delete":
         pass
     st.query_params.clear()
     st.success("Account deletion cancelled. Your account is completely safe!")
-    time.sleep(2)
+    import time; time.sleep(2)
     st.rerun()
 
-# ─── PERSISTENT SESSION CHECK ─────────────────────────────────────────────────
-# ÖNEMLİ DÜZELTME: recovery_mode içindeyken session check yapıp token'ları silmesini engelledik.
-if st.session_state.access_token and not st.session_state.is_logged_in and not st.session_state.recovery_mode:
+# ─── PERSISTENT SESSION RESTORE ───────────────────────────────────────────────
+if st.session_state.access_token and not st.session_state.is_logged_in:
     try:
+        supabase.auth.set_session(st.session_state.access_token, st.session_state.refresh_token)
         _check = supabase.auth.get_user()
         if _check and _check.user:
             st.session_state.is_logged_in = True
@@ -298,7 +257,6 @@ auth_texts = {
         "pw_reset_success":"✅ Password updated successfully! Logging you in...",
         "pw_reset_min_err":"❌ Password must be at least 6 characters!",
         "new_pw_label":"New Password",
-        "lang_select_label": "🌐 Select Language"
     },
     "Türkçe": {
         "access":"SarSa AI Erişimi","login":"Giriş Yap","register":"Kayıt Ol",
@@ -326,7 +284,6 @@ auth_texts = {
         "pw_reset_success":"✅ Şifre başarıyla güncellendi! Giriş yapılıyor...",
         "pw_reset_min_err":"❌ Şifre en az 6 karakter olmalıdır!",
         "new_pw_label":"Yeni Şifre",
-        "lang_select_label": "🌐 Dil Seçin"
     },
     "Español": {
         "access":"Acceso a SarSa AI","login":"Iniciar Sesión","register":"Registrarse",
@@ -354,7 +311,6 @@ auth_texts = {
         "pw_reset_success":"✅ ¡Contraseña actualizada! Iniciando sesión...",
         "pw_reset_min_err":"❌ Mínimo 6 caracteres requeridos.",
         "new_pw_label":"Nueva Contraseña",
-        "lang_select_label": "🌐 Seleccionar Idioma"
     },
     "Deutsch": {
         "access":"SarSa AI Zugang","login":"Anmelden","register":"Registrieren",
@@ -382,7 +338,6 @@ auth_texts = {
         "pw_reset_success":"✅ Passwort aktualisiert! Einloggen...",
         "pw_reset_min_err":"❌ Mindestens 6 Zeichen erforderlich.",
         "new_pw_label":"Neues Passwort",
-        "lang_select_label": "🌐 Sprache Wählen"
     },
     "Français": {
         "access":"Accès SarSa AI","login":"Connexion","register":"S'inscrire",
@@ -410,7 +365,6 @@ auth_texts = {
         "pw_reset_success":"✅ Mot de passe mis à jour ! Connexion en cours...",
         "pw_reset_min_err":"❌ 6 caractères minimum.",
         "new_pw_label":"Nouveau mot de passe",
-        "lang_select_label": "🌐 Choisir la Langue"
     },
     "Português": {
         "access":"Acesso SarSa AI","login":"Entrar","register":"Registar",
@@ -438,7 +392,6 @@ auth_texts = {
         "pw_reset_success":"✅ Senha atualizada! Entrando...",
         "pw_reset_min_err":"❌ Mínimo de 6 caracteres.",
         "new_pw_label":"Nova Senha",
-        "lang_select_label": "🌐 Selecionar Idioma"
     },
     "日本語": {
         "access":"SarSa AI アクセス","login":"ログイン","register":"新規登録",
@@ -466,7 +419,6 @@ auth_texts = {
         "pw_reset_success":"✅ パスワードが更新されました！ログイン中...",
         "pw_reset_min_err":"❌ 6文字以上必要です。",
         "new_pw_label":"新しいパスワード",
-        "lang_select_label": "🌐 言語を選択"
     },
     "简体中文": {
         "access":"SarSa AI 访问","login":"登录","register":"注册",
@@ -494,7 +446,6 @@ auth_texts = {
         "pw_reset_success":"✅ 密码已更新！正在登录...",
         "pw_reset_min_err":"❌ 密码至少需要6位。",
         "new_pw_label":"新密码",
-        "lang_select_label": "🌐 选择语言"
     },
     "العربية": {
         "access":"دخول SarSa AI","login":"تسجيل الدخول","register":"إنشاء حساب",
@@ -522,7 +473,6 @@ auth_texts = {
         "pw_reset_success":"✅ تم تحديث كلمة المرور! جاري تسجيل الدخول...",
         "pw_reset_min_err":"❌ يجب أن تكون 6 خانات على الأقل.",
         "new_pw_label":"كلمة المرور الجديدة",
-        "lang_select_label": "🌐 اختر اللغة"
     }
 }
 
@@ -531,7 +481,7 @@ ui_languages = {
     "Türkçe": { "title": "SarSa AI | Gayrimenkul Zekâ Platformu", "service_desc": "Hepsi Bir Arada Görsel Mülk Zekâsı ve Küresel Satış Otomasyonu", "subtitle": "Mülk fotoğraflarını anında profesyonel ilanlara, sosyal medya kitlerine, sinematik senaryolara, teknik şartnamelere, e-posta kampanyalarına ve SEO metinlerine dönüştürün.", "settings": "Yapılandırma", "target_lang": "İlan Yazım Dili...", "prop_type": "Emlak Tipi", "price": "Pazar Fiyatı", "location": "Konum", "tone": "Pazarlama Stratejisi", "tones": ["Standart Profesyonel", "Ultra-Lüks", "Yatırım Odaklı", "Modern Minimalist", "Aile Yaşamı", "Tatil Kiralık", "Ticari"], "ph_prop": "Örn: 3+1 Daire, Müstakil Villa...", "ph_price": "Örn: 5.000.000 TL veya $2.500/ay...", "ph_loc": "Örn: Beşiktaş, İstanbul veya Dubai Marina...", "bedrooms": "Yatak Odası", "bathrooms": "Banyo", "area": "Alan", "year_built": "İnşaat Yılı", "ph_beds": "Örn: 3", "ph_baths": "Örn: 2", "ph_area": "Örn: 185 m²", "ph_year": "Örn: 2022", "furnishing": "Eşya Durumu", "furnishing_opts": ["Belirtilmedi", "Tam Eşyalı", "Yarı Eşyalı", "Eşyasız"], "target_audience": "Hedef Kitle", "audience_opts": ["Genel Pazar", "Lüks Alıcılar", "Yatırımcılar & ROI Odaklı", "Yabancılar & Uluslararası", "İlk Ev Alıcıları", "Tatil / Kiralık Pazar", "Ticari Kiracılar"], "custom_inst": "Özel Notlar ve Öne Çıkan Özellikler", "custom_inst_ph": "Örn: Özel havuz, panoramik manzara, akıllı ev sistemi...", "btn": "SEÇİLİ VARLIKLARI OLUŞTUR", "upload_label": "Fotoğrafları Buraya Bırakın", "result": "Yönetici Önizlemesi", "loading": "Premium pazarlama ekosisteminiz hazırlanıyor...", "empty": "Profesyonel analiz için görsel bekleniyor. Fotoğrafları yükleyin ve soldaki bilgileri doldurun.", "download": "Bölümü İndir (TXT)", "save_btn": "Kaydet", "saved_msg": "Kaydedildi!", "error": "Hata:", "clear_btn": "Formu Temizle", "select_sections": "Oluşturulacak Bölümleri Seçin", "tab_main": "Ana İlan", "tab_social": "Sosyal Medya Kiti", "tab_video": "Video Senaryoları", "tab_tech": "Teknik Özellikler", "tab_email": "E-posta Kampanyası", "tab_seo": "SEO & Web Metni", "tab_photo": "Fotoğraf Rehberi", "label_main": "Satış Metni", "label_social": "Sosyal Medya", "label_video": "Video Script", "label_tech": "Teknik Detaylar", "label_email": "E-posta Kampanyası", "label_seo": "SEO & Web Metni", "label_photo": "Fotoğraf Tavsiyeleri", "extra_details": "Ek Mülk Detayları", "interface_lang": "Arayüz Dili", "logout": "Çıkış Yap", "acc_settings": "Hesap Ayarları", "update_pw": "Şifre Güncelle", "new_pw": "Yeni Şifre", "btn_update": "Şifreyi Güncelle", "danger_zone": "Tehlikeli Bölge", "delete_confirm": "Hesabımı kalıcı olarak silmek istiyorum.", "btn_delete": "Hesabı Sil", "pw_min_err": "Şifre en az 6 karakter olmalıdır.", "delete_email_sent": "Onay e-postası gönderildi! Gelen kutunuzu kontrol edin ve silmeyi onaylamak için bağlantıya tıklayın.", "delete_email_fail": "E-posta gönderilemedi. Lütfen SMTP ayarlarını kontrol edin." },
     "Español": { "title": "SarSa AI | Plataforma de Inteligencia Inmobiliaria", "service_desc": "Inteligencia Visual de Propiedades y Automatización de Ventas Globales", "subtitle": "Convierta fotos en anuncios premium, kits de redes sociales, guiones de video, fichas técnicas, campañas de email y copy SEO al instante.", "settings": "Configuración", "target_lang": "Escribir en...", "prop_type": "Tipo de Propiedad", "price": "Precio de Mercado", "location": "Ubicación", "tone": "Estrategia de Marketing", "tones": ["Profesional Estándar", "Ultra-Lujo", "Enfoque de Inversión", "Minimalista Moderno", "Vida Familiar", "Alquiler Vacacional", "Comercial"], "ph_prop": "Ej: Apartamento 3+1, Villa de Lujo...", "ph_price": "Ej: $850.000 o EUR 1.500/mes...", "ph_loc": "Ej: Madrid, España o Marbella...", "bedrooms": "Dormitorios", "bathrooms": "Baños", "area": "Área", "year_built": "Año de Construcción", "ph_beds": "Ej: 3", "ph_baths": "Ej: 2", "ph_area": "Ej: 185 m²", "ph_year": "Ej: 2022", "furnishing": "Amueblado", "furnishing_opts": ["No especificado", "Completamente Amueblado", "Semi-Amueblado", "Sin Amueblar"], "target_audience": "Público Objetivo", "audience_opts": ["Mercado General", "Compradores de Lujo", "Inversores & ROI", "Extranjeros & Internacionales", "Primeros Compradores", "Mercado Vacacional", "Inquilinos Comerciales"], "custom_inst": "Notas Especiales y Características", "custom_inst_ph": "Ej: Piscina privada, vistas al mar, domótica...", "btn": "GENERAR ACTIVOS SELECCIONADOS", "upload_label": "Subir Fotos de la Propiedad", "result": "Vista Previa Ejecutiva", "loading": "Creando su ecosistema de marketing premium...", "empty": "Esperando imágenes para análisis profesional. Suba fotos y complete los detalles a la izquierda.", "download": "Exportar Sección (TXT)", "save_btn": "Guardar Cambios", "saved_msg": "Guardado!", "error": "Error:", "clear_btn": "Limpiar Formulario", "select_sections": "Seleccionar Secciones a Generar", "tab_main": "Anuncio Premium", "tab_social": "Kit de Redes Sociales", "tab_video": "Guiones de Video", "tab_tech": "Especificaciones", "tab_email": "Campaña de Email", "tab_seo": "SEO & Web Copy", "tab_photo": "Guía de Fotos", "label_main": "Texto de Ventas", "label_social": "Contenido Social", "label_video": "Guion de Video", "label_tech": "Ficha Técnica", "label_email": "Campaña de Email", "label_seo": "SEO & Web Copy", "label_photo": "Recomendaciones de Fotografía", "extra_details": "Detalles Adicionales", "interface_lang": "Idioma de Interfaz", "logout": "Cerrar Sesión", "acc_settings": "Cuenta", "update_pw": "Actualizar Contraseña", "new_pw": "Nueva Contraseña", "btn_update": "Actualizar Ahora", "danger_zone": "Zona de Peligro", "delete_confirm": "Quiero eliminar mi cuenta permanentemente.", "btn_delete": "Eliminar Cuenta", "pw_min_err": "Mínimo 6 caracteres requeridos.", "delete_email_sent": "Email de confirmación enviado! Revisa tu bandeja de entrada.", "delete_email_fail": "Error al enviar email. Verifique la configuración SMTP." },
     "Deutsch": { "title": "SarSa AI | Immobilien-Intelligenz-Plattform", "service_desc": "All-in-One Visuelle Objektintelligenz & Globale Verkaufsautomatisierung", "subtitle": "Verwandeln Sie Fotos sofort in Premium-Exposés, Social-Media-Kits, Videoskripte, Datenblätter, E-Mail-Kampagnen und SEO-Texte.", "settings": "Konfiguration", "target_lang": "Erstellen in...", "prop_type": "Objekttyp", "price": "Marktpreis", "location": "Standort", "tone": "Marketingstrategie", "tones": ["Standard-Profi", "Ultra-Luxus", "Investitionsfokus", "Modern-Minimalistisch", "Familienleben", "Ferienmiete", "Gewerbe"], "ph_prop": "Z.B. 3-Zimmer-Wohnung, Luxusvilla...", "ph_price": "Z.B. 850.000€ oder 2.000€/Monat...", "ph_loc": "Z.B. Berlin, Deutschland oder Hamburg...", "bedrooms": "Schlafzimmer", "bathrooms": "Badezimmer", "area": "Fläche", "year_built": "Baujahr", "ph_beds": "Z.B. 3", "ph_baths": "Z.B. 2", "ph_area": "Z.B. 185 m²", "ph_year": "Z.B. 2022", "furnishing": "Möblierung", "furnishing_opts": ["Nicht angegeben", "Vollmöbliert", "Teilmöbliert", "Unmöbliert"], "target_audience": "Zielgruppe", "audience_opts": ["Allgemeiner Markt", "Luxuskäufer", "Investoren & ROI", "Expats & Internationale", "Erstkäufer", "Ferienmarkt", "Gewerbemieter"], "custom_inst": "Notizen & Besonderheiten", "custom_inst_ph": "Z.B. Privatpool, Panoramasicht, Smart-Home...", "btn": "AUSGEWÄHLTE ASSETS ERSTELLEN", "upload_label": "Fotos hier hochladen", "result": "Executive-Vorschau", "loading": "Ihr Marketing-Ökosystem wird erstellt...", "empty": "Warte auf Bilder für die Analyse. Laden Sie Fotos hoch und füllen Sie die Details aus.", "download": "Abschnitt Exportieren (TXT)", "save_btn": "Speichern", "saved_msg": "Gespeichert!", "error": "Fehler:", "clear_btn": "Formular Zurücksetzen", "select_sections": "Zu erstellende Bereiche wählen", "tab_main": "Premium-Exposé", "tab_social": "Social Media Kit", "tab_video": "Videoskripte", "tab_tech": "Tech-Details", "tab_email": "E-Mail-Kampagne", "tab_seo": "SEO & Webtext", "tab_photo": "Foto-Guide", "label_main": "Verkaufstext", "label_social": "Social-Media-Content", "label_video": "Videoskript", "label_tech": "Technische Daten", "label_email": "E-Mail-Kampagne", "label_seo": "SEO & Webtext", "label_photo": "Fotografie-Empfehlungen", "extra_details": "Weitere Details", "interface_lang": "Oberfläche Sprache", "logout": "Abmelden", "acc_settings": "Kontoeinstellungen", "update_pw": "Passwort ändern", "new_pw": "Neues Passwort", "btn_update": "Jetzt aktualisieren", "danger_zone": "Gefahrenzone", "delete_confirm": "Ich möchte mein Konto dauerhaft löschen.", "btn_delete": "Konto löschen", "pw_min_err": "Mindestens 6 Zeichen erforderlich.", "delete_email_sent": "Bestätigungs-E-Mail gesendet! Überprüfen Sie Ihren Posteingang.", "delete_email_fail": "E-Mail konnte nicht gesendet werden. SMTP-Einstellungen prüfen." },
-    "Français": { "title": "SarSa AI | Plateforme d'Intelligence Immobilière", "service_desc": "Intelligence Visuelle Immobilière et Automatisation des Ventes Globales", "subtitle": "Transformez vos photos en annonces premium, kits réseaux sociaux, scripts vidéo, fiches techniques, campagnes email et copy SEO instantanément.", "settings": "Configuration", "target_lang": "Rédiger en...", "prop_type": "Type de Bien", "price": "Prix du Marché", "location": "Localisation", "tone": "Stratégie Marketing", "tones": ["Standard Pro", "Ultra-Luxe", "Focus Investissement", "Minimaliste Moderne", "Vie de Famille", "Location Saisonnière", "Commercial"], "ph_prop": "Ex: Appartement T4, Villa de Luxe...", "ph_price": "Ex: 850.000€ ou 1.500€/mois...", "ph_loc": "Ex: Paris, Côte d'Azur ou Lyon...", "bedrooms": "Chambres", "bathrooms": "Salles de Bain", "area": "Surface", "year_built": "Année de Construction", "ph_beds": "Ex: 3", "ph_baths": "Ex: 2", "ph_area": "Ex: 185 m²", "ph_year": "Ex: 2022", "furnishing": "Ameublement", "furnishing_opts": ["Non spécifié", "Entièrement Meublé", "Semi-Meublé", "Non Meublé"], "target_audience": "Audience Cible", "audience_opts": ["Marché Général", "Acheteurs de Luxe", "Investisseurs & ROI", "Expatriés & Internationaux", "Primo-Accédants", "Marché Vacances", "Locataires Commerciaux"], "custom_inst": "Notes Spéciales & Points Forts", "custom_inst_ph": "Ex: Piscine privée, vue panoramique, domotique...", "btn": "GÉNÉRER LES ACTIFS SÉLECTIONNÉS", "upload_label": "Déposer les Photos Ici", "result": "Aperçu Exécutif", "loading": "Préparation de votre écosystème marketing...", "empty": "En attente d'images pour analyse. Déposez des photos et remplissez les détails à gauche.", "download": "Exporter Section (TXT)", "save_btn": "Enregistrer", "saved_msg": "Enregistré!", "error": "Erreur:", "clear_btn": "Réinitialiser", "select_sections": "Sélectionner les sections à générer", "tab_main": "Annonce Premium", "tab_social": "Kit Réseaux Sociaux", "tab_video": "Scripts Vidéo", "tab_tech": "Spécifications", "tab_email": "Campagne Email", "tab_seo": "SEO & Web Copy", "tab_photo": "Guide Photo", "label_main": "Texte de Vente", "label_social": "Contenido Social", "label_video": "Script Vidéo", "label_tech": "Détails Techniques", "label_email": "Campagne Email", "label_seo": "SEO & Web Copy", "label_photo": "Recommandations Photographiques", "extra_details": "Détails Supplémentaires", "interface_lang": "Langue Interface", "logout": "Déconnexion", "acc_settings": "Paramètres", "update_pw": "Changer MDP", "new_pw": "Nouveau MDP", "btn_update": "Mettre à jour", "danger_zone": "Zone de Danger", "delete_confirm": "Supprimer définitivement mon compte.", "btn_delete": "Supprimer le compte", "pw_min_err": "6 caractères minimum.", "delete_email_sent": "Email de confirmation envoyé! Vérifiez votre boîte.", "delete_email_fail": "Echec d'envoi. Vérifiez les paramètres SMTP." },
+    "Français": { "title": "SarSa AI | Plateforme d'Intelligence Immobilière", "service_desc": "Intelligence Visuelle Immobilière et Automatisation des Ventes Globales", "subtitle": "Transformez vos photos en annonces premium, kits réseaux sociaux, scripts vidéo, fiches techniques, campagnes email et copy SEO instantanément.", "settings": "Configuration", "target_lang": "Rédiger en...", "prop_type": "Type de Bien", "price": "Prix du Marché", "location": "Localisation", "tone": "Stratégie Marketing", "tones": ["Standard Pro", "Ultra-Luxe", "Focus Investissement", "Minimaliste Moderne", "Vie de Famille", "Location Saisonnière", "Commercial"], "ph_prop": "Ex: Appartement T4, Villa de Luxe...", "ph_price": "Ex: 850.000€ ou 1.500€/mois...", "ph_loc": "Ex: Paris, Côte d'Azur ou Lyon...", "bedrooms": "Chambres", "bathrooms": "Salles de Bain", "area": "Surface", "year_built": "Année de Construction", "ph_beds": "Ex: 3", "ph_baths": "Ex: 2", "ph_area": "Ex: 185 m²", "ph_year": "Ex: 2022", "furnishing": "Ameublement", "furnishing_opts": ["Non spécifié", "Entièrement Meublé", "Semi-Meublé", "Non Meublé"], "target_audience": "Audience Cible", "audience_opts": ["Marché Général", "Acheteurs de Luxe", "Investisseurs & ROI", "Expatriés & Internationaux", "Primo-Accédants", "Marché Vacances", "Locataires Commerciaux"], "custom_inst": "Notes Spéciales & Points Forts", "custom_inst_ph": "Ex: Piscine privée, vue panoramique, domotique...", "btn": "GÉNÉRER LES ACTIFS SÉLECTIONNÉS", "upload_label": "Déposer les Photos Ici", "result": "Aperçu Exécutif", "loading": "Préparation de votre écosystème marketing...", "empty": "En attente d'images pour analyse. Déposez des photos et remplissez les détails à gauche.", "download": "Exporter Section (TXT)", "save_btn": "Enregistrer", "saved_msg": "Enregistré!", "error": "Erreur:", "clear_btn": "Réinitialiser", "select_sections": "Sélectionner les sections à générer", "tab_main": "Annonce Premium", "tab_social": "Kit Réseaux Sociaux", "tab_video": "Scripts Vidéo", "tab_tech": "Spécifications", "tab_email": "Campagne Email", "tab_seo": "SEO & Web Copy", "tab_photo": "Guide Photo", "label_main": "Texte de Vente", "label_social": "Contenu Social", "label_video": "Script Vidéo", "label_tech": "Détails Techniques", "label_email": "Campagne Email", "label_seo": "SEO & Web Copy", "label_photo": "Recommandations Photographiques", "extra_details": "Détails Supplémentaires", "interface_lang": "Langue Interface", "logout": "Déconnexion", "acc_settings": "Paramètres", "update_pw": "Changer MDP", "new_pw": "Nouveau MDP", "btn_update": "Mettre à jour", "danger_zone": "Zone de Danger", "delete_confirm": "Supprimer définitivement mon compte.", "btn_delete": "Supprimer le compte", "pw_min_err": "6 caractères minimum.", "delete_email_sent": "Email de confirmation envoyé! Vérifiez votre boîte.", "delete_email_fail": "Echec d'envoi. Vérifiez les paramètres SMTP." },
     "Português": { "title": "SarSa AI | Plataforma de Inteligência Imobiliária", "service_desc": "Inteligência Visual Imobiliária e Automação de Vendas Globais", "subtitle": "Transforme fotos em anúncios premium, kits de redes sociais, roteiros de vídeo, fichas técnicas, campanhas de email e copy SEO instantaneamente.", "settings": "Configuração", "target_lang": "Escrever em...", "prop_type": "Tipo de Imóvel", "price": "Preço de Mercado", "location": "Localização", "tone": "Estratégia de Marketing", "tones": ["Profissional Padrão", "Ultra-Luxo", "Foco em Investimento", "Minimalista Moderno", "Vida Familiar", "Aluguel de Temporada", "Comercial"], "ph_prop": "Ex: Apartamento T3, Moradia de Luxo...", "ph_price": "Ex: 500.000€ ou 1.500€/mês...", "ph_loc": "Ex: Lisboa, Algarve ou Porto...", "bedrooms": "Quartos", "bathrooms": "Banheiros", "area": "Área", "year_built": "Ano de Construção", "ph_beds": "Ex: 3", "ph_baths": "Ex: 2", "ph_area": "Ex: 185 m²", "ph_year": "Ex: 2022", "furnishing": "Mobiliário", "furnishing_opts": ["Não especificado", "Completamente Mobilado", "Semi-Mobilado", "Sem Mobília"], "target_audience": "Público-Alvo", "audience_opts": ["Mercado Geral", "Compradores de Luxo", "Investidores & ROI", "Expats e Internacionais", "Primeiros Compradores", "Mercado de Férias", "Inquilinos Comerciais"], "custom_inst": "Notas Especiais e Destaques", "custom_inst_ph": "Ex: Piscina privativa, vista panorâmica, casa inteligente...", "btn": "GERAR ATIVOS SELECIONADOS", "upload_label": "Enviar Fotos do Imóvel", "result": "Pré-visualização Executiva", "loading": "Preparando seu ecossistema de marketing...", "empty": "Aguardando imagens para análise. Envie fotos e preencha os detalhes à esquerda.", "download": "Exportar Secção (TXT)", "save_btn": "Salvar Alterações", "saved_msg": "Salvo!", "error": "Erro:", "clear_btn": "Limpar Formulário", "select_sections": "Selecionar Seções a Gerar", "tab_main": "Anúncio Premium", "tab_social": "Kit Redes Sociais", "tab_video": "Roteiros de Vídeo", "tab_tech": "Especificações", "tab_email": "Campanha de Email", "tab_seo": "SEO & Web Copy", "tab_photo": "Guia de Fotos", "label_main": "Texto de Vendas", "label_social": "Conteúdo Social", "label_video": "Roteiro de Vídeo", "label_tech": "Especificações Técnicas", "label_email": "Campanha Email", "label_seo": "SEO & Web Copy", "label_photo": "Recomendações de Fotografia", "extra_details": "Detalhes Adicionais", "interface_lang": "Idioma Interface", "logout": "Sair", "acc_settings": "Configurações", "update_pw": "Alterar Senha", "new_pw": "Nova Senha", "btn_update": "Atualizar Agora", "danger_zone": "Zona de Perigo", "delete_confirm": "Quero excluir minha conta permanentemente.", "btn_delete": "Excluir Conta", "pw_min_err": "Mínimo de 6 caracteres.", "delete_email_sent": "Email de confirmação enviado! Verifique sua caixa de entrada.", "delete_email_fail": "Falha ao enviar email. Verifique as configurações SMTP." },
     "日本語": { "title": "SarSa AI | 不動産インテリジェンス・プラットフォーム", "service_desc": "オールインワン視覚的物件インテリジェンス＆グローバル販売自動化", "subtitle": "物件写真をプレミアム広告、SNSキット、動画台本、技術仕様書、メールキャンペーン、SEOコピーに瞬時に変換します。", "settings": "設定", "target_lang": "作成言語...", "prop_type": "物件種別", "price": "市場価格", "location": "所在地", "tone": "マーケティング戦略", "tones": ["標準プロ", "ウルトラ・ラグジュアリー", "投資重視", "モダン・ミニマリスト", "ファミリー向け", "バケーションレンタル", "商業用"], "ph_prop": "例: 3LDKマンション、高級別荘...", "ph_price": "例: 8500万円 または 月20万円...", "ph_loc": "例: 東京都港区、大阪、ドバイ...", "bedrooms": "寝室数", "bathrooms": "浴室数", "area": "面積", "year_built": "建築年", "ph_beds": "例: 3", "ph_baths": "例: 2", "ph_area": "例: 185 m²", "ph_year": "例: 2022", "furnishing": "家具", "furnishing_opts": ["未指定", "フル家具付き", "一部家具付き", "家具なし"], "target_audience": "ターゲット層", "audience_opts": ["一般市場", "富裕層バイヤー", "投資家 & ROI重視", "海外居住者", "初めての購入者", "休暇・別荘市場", "商業テナント"], "custom_inst": "特記事項 ＆ アピールポイント", "custom_inst_ph": "例: プライベートプール、パノラマビュー、スマートホーム...", "btn": "選択した資産を生成", "upload_label": "ここに物件写真をアップロード", "result": "エグゼクティブ・プレビュー", "loading": "プレミアム・マーケティング・エコシステムを構築中...", "empty": "分析用の画像を待機中。写真をアップロードし、左側に詳細を入力してください。", "download": "セクションを書き出し (TXT)", "save_btn": "変更を保存", "saved_msg": "保存完了！", "error": "エラー:", "clear_btn": "フォームをリセット", "select_sections": "生成するセクションを選択", "tab_main": "プレミアム広告", "tab_social": "SNSキット", "tab_video": "動画台本", "tab_tech": "技術仕様", "tab_email": "メールキャンペーン", "tab_seo": "SEO ＆ Webコピー", "tab_photo": "写真ガイド", "label_main": "セールスコピー", "label_social": "SNSコンテンツ", "label_video": "動画シナリオ", "label_tech": "技術詳細", "label_email": "メールキャンペーン", "label_seo": "SEOテキスト", "label_photo": "撮影のアドバイス", "extra_details": "物件詳細情報", "interface_lang": "インターフェース言語", "logout": "ログアウト", "acc_settings": "アカウント設定", "update_pw": "パスワード変更", "new_pw": "新しいパスワード", "btn_update": "今すぐ更新", "danger_zone": "危険区域", "delete_confirm": "アカウントを完全に削除します。", "btn_delete": "アカウント削除", "pw_min_err": "6文字以上必要です。", "delete_email_sent": "確認メールを送信しました！受信トレイを確認してください。", "delete_email_fail": "メールの送信に失敗しました。SMTP設定を確認してください。" },
     "简体中文": { "title": "SarSa AI | 房地产智能平台", "service_desc": "全方位房产视觉智能与全球销售自动化", "subtitle": "立即将房产照片转化为优质房源描述、社交媒体包、视频脚本、技术规格、邮件营销和 SEO 文案。", "settings": "配置", "target_lang": "编写语言...", "prop_type": "房产类型", "price": "市场价格", "location": "地点", "tone": "营销策略", "tones": ["标准专业", "顶级豪宅", "投资价值", "现代简约", "家庭生活", "度假租赁", "商业办公"], "ph_prop": "例如：3室1厅公寓、豪华别墅...", "ph_price": "例如：$850,000 或 $2,000/月...", "ph_loc": "例如：上海浦东新区、北京或伦敦...", "bedrooms": "卧室", "bathrooms": "卫生间", "area": "面积", "year_built": "建造年份", "ph_beds": "例如：3", "ph_baths": "例如：2", "ph_area": "例如：185 平方米", "ph_year": "例如：2022", "furnishing": "装修情况", "furnishing_opts": ["未指定", "精装修（含家具）", "简装修", "毛坯房"], "target_audience": "目标受众", "audience_opts": ["大众市场", "豪宅买家", "投资者 & 投资回报", "外籍人士", "首次购房者", "度假市场", "商业租客"], "custom_inst": "特别备注与亮点", "custom_inst_ph": "例如：私人泳池、全景海景、智能家居、临近国际学校...", "btn": "生成所选资产", "upload_label": "在此上传房产照片", "result": "高级预览", "loading": "正在打造您的专属营销生态系统...", "empty": "等待照片进行专业分析。请上传照片并在左侧填写详细信息。", "download": "导出此部分 (TXT)", "save_btn": "保存更改", "saved_msg": "已保存！", "error": "错误：", "clear_btn": "重置表单", "select_sections": "选择要生成的章节", "tab_main": "优质房源", "tab_social": "社媒包", "tab_video": "视频脚本", "tab_tech": "技术规格", "tab_email": "邮件营销", "tab_seo": "SEO 网页文案", "tab_photo": "拍摄指南", "label_main": "销售文案", "label_social": "社媒内容", "label_video": "视频脚本", "label_tech": "技术规格", "label_email": "邮件营销", "label_seo": "SEO 文案", "label_photo": "摄影建议", "extra_details": "额外房产细节", "interface_lang": "界面语言", "logout": "退出登录", "acc_settings": "账户设置", "update_pw": "更改密码", "new_pw": "新密码", "btn_update": "立即更新", "danger_zone": "危险区域", "delete_confirm": "我确认要永久删除我的账户。", "btn_delete": "删除账户", "pw_min_err": "密码至少需要6位。", "delete_email_sent": "确认邮件已发送！请检查您的收件箱。", "delete_email_fail": "发送邮件失败。请检查SMTP设置。" },
@@ -558,12 +508,6 @@ html, body, [class*="st-"] { font-family: 'Plus Jakarta Sans', sans-serif !impor
 </style>
 """
 
-# ─── LANGUAGE HELPER FUNCTION ─────────────────────────────────────────────────
-def update_lang_global(key):
-    st.session_state.auth_lang = st.session_state[key]
-    # Seçilen dili URL'e kaydet ki F5 yapılınca unutmasın
-    st.query_params["lang"] = st.session_state.auth_lang
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # ─── PAGE 1: EMAIL CONFIRMED — Dedicated full page ───────────────────────────
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -571,11 +515,13 @@ if st.session_state.get('show_email_confirmed'):
     at = auth_texts.get(st.session_state.auth_lang, auth_texts["English"])
     st.markdown(_auth_page_css, unsafe_allow_html=True)
 
+    def _update_lang_confirmed():
+        st.session_state.auth_lang = st.session_state._lang_confirmed
     st.selectbox(
-        at.get("lang_select_label", "🌐 Select Language"),
+        "🌐 Select Language / Dil Seçin",
         list(auth_texts.keys()),
         index=list(auth_texts.keys()).index(st.session_state.auth_lang) if st.session_state.auth_lang in auth_texts else 0,
-        key="_lang_confirmed", on_change=update_lang_global, args=("_lang_confirmed",)
+        key="_lang_confirmed", on_change=_update_lang_confirmed
     )
     at = auth_texts.get(st.session_state.auth_lang, auth_texts["English"])
 
@@ -583,22 +529,24 @@ if st.session_state.get('show_email_confirmed'):
     <div style="text-align:center; padding: 1.5rem 0 2rem;">
         <div style="font-size:5.5rem; line-height:1; margin-bottom:1.2rem;
                     filter: drop-shadow(0 4px 12px rgba(34,197,94,0.3));">✅</div>
-        <h1 style="color:#0f172a; font-weight:800; font-size:2.2rem; margin:0 0 0.8rem;">
+        <h1 style="color:#0f172a; font-weight:800; font-size:2rem; margin:0 0 0.8rem;">
             {at.get("email_confirmed_title","✅ Email Verified Successfully!")}
         </h1>
-        <p style="color:#475569; font-size:1.1rem; line-height:1.7; margin:0 0 0.5rem;">
+        <p style="color:#475569; font-size:1.05rem; line-height:1.7; margin:0 0 0.5rem;">
             {at.get("email_confirmed_msg","Your account has been confirmed and is ready to use.")}
         </p>
-        <p style="color:#94a3b8; font-size:0.95rem;">
+        <p style="color:#94a3b8; font-size:0.92rem;">
             {at.get("email_confirmed_sub","Click the button below to go to the login page.")}
         </p>
     </div>
     <hr style="border:none; border-top:1px solid #f1f5f9; margin: 0 0 1.8rem;">
     """, unsafe_allow_html=True)
 
-    if st.button(at.get("email_confirmed_btn", "🔑 Go to Login"), use_container_width=True):
-        st.session_state.show_email_confirmed = False
-        st.rerun()
+    col1, col2, col3 = st.columns([1, 3, 1])
+    with col2:
+        if st.button(at.get("email_confirmed_btn", "🔑 Go to Login"), use_container_width=True):
+            st.session_state.show_email_confirmed = False
+            st.rerun()
 
     st.markdown("""
     <p style="text-align:center; color:#cbd5e1; font-size:0.8rem; margin-top:2rem;">
@@ -607,17 +555,19 @@ if st.session_state.get('show_email_confirmed'):
     st.stop()
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# ─── PAGE 2: PASSWORD RECOVERY FORM (FIXED) ───────────────────────────────────
+# ─── PAGE 2: PASSWORD RECOVERY FORM ──────────────────────────────────────────
 # ═══════════════════════════════════════════════════════════════════════════════
-if st.session_state.get('recovery_mode'):
+if st.session_state.recovery_mode:
     _at_rec = auth_texts.get(st.session_state.auth_lang, auth_texts["English"])
     st.markdown(_auth_page_css, unsafe_allow_html=True)
 
+    def _update_lang_recovery():
+        st.session_state.auth_lang = st.session_state._lang_recovery
     st.selectbox(
-        _at_rec.get("lang_select_label", "🌐 Select Language"),
+        "🌐 Select Language / Dil Seçin",
         list(auth_texts.keys()),
         index=list(auth_texts.keys()).index(st.session_state.auth_lang) if st.session_state.auth_lang in auth_texts else 0,
-        key="_lang_recovery", on_change=update_lang_global, args=("_lang_recovery",)
+        key="_lang_recovery", on_change=_update_lang_recovery
     )
     _at_rec = auth_texts.get(st.session_state.auth_lang, auth_texts["English"])
 
@@ -635,42 +585,57 @@ if st.session_state.get('recovery_mode'):
     """, unsafe_allow_html=True)
 
     with st.form("recovery_form"):
-        new_password_recovery = st.text_input(_at_rec.get("new_pw_label", "New Password"), type="password")
-        submit_recovery = st.form_submit_button(_at_rec.get("pw_reset_btn", "✅ Set Password"))
+        new_password_recovery = st.text_input(
+            _at_rec.get("new_pw_label", "New Password"),
+            type="password", placeholder="••••••••"
+        )
+        col_sub, col_can = st.columns(2)
+        with col_sub:
+            submit_recovery = st.form_submit_button(
+                _at_rec.get("pw_reset_btn", "✅ Set Password & Login"),
+                use_container_width=True
+            )
+        with col_can:
+            cancel_recovery = st.form_submit_button(
+                _at_rec.get("pw_reset_cancel", "❌ Cancel"),
+                use_container_width=True
+            )
+
+        if cancel_recovery:
+            st.session_state.recovery_mode = False
+            st.session_state.is_logged_in  = False
+            st.rerun()
 
         if submit_recovery:
-            at = st.session_state.get('access_token')
-            rt = st.session_state.get('refresh_token')
-
-            if not at:
-                st.error("❌ Hata: Oturum verisi bulunamadı. Lütfen maildeki linke tekrar tıklayın.")
-            elif len(new_password_recovery) < 6:
+            if len(new_password_recovery) < 6:
                 st.error(_at_rec.get("pw_reset_min_err", "❌ Password must be at least 6 characters!"))
             else:
                 try:
-                    # Supabase oturumunu bağla ve şifreyi güncelle
-                    supabase.auth.set_session(at, rt)
+                    if st.session_state.access_token:
+                        supabase.auth.set_session(
+                            st.session_state.access_token,
+                            st.session_state.refresh_token
+                        )
                     supabase.auth.update_user({"password": new_password_recovery})
-                    
-                    st.success(_at_rec.get("pw_reset_success", "✅ Password updated!"))
-                    
-                    # Temizlik ve yönlendirme
+                    st.success(_at_rec.get("pw_reset_success", "✅ Password updated! Logging you in..."))
                     st.session_state.recovery_mode = False
-                    st.session_state.access_token = None
-                    time.sleep(2)
+                    st.session_state.is_logged_in  = True
+                    import time; time.sleep(1.5)
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Error: {str(e)}")
-
-    # Giriş ekranının aşağıda çıkmaması için burayı kilitliyoruz
+                    st.error(f"Error: {e}")
     st.stop()
-
 
 # ─── AUTH FUNCTIONS ────────────────────────────────────────────────────────────
 def get_status():
     if st.session_state.get('is_logged_in'):
         return "paid", st.session_state.user_email
     try:
+        if st.session_state.access_token:
+            supabase.auth.set_session(
+                st.session_state.access_token,
+                st.session_state.refresh_token
+            )
         user_resp = supabase.auth.get_user()
         if not user_resp or not user_resp.user:
             return "logged_out", None
@@ -682,6 +647,9 @@ def get_status():
         return "paid", user.email
     except Exception:
         return "logged_out", None
+
+def update_lang():
+    st.session_state.auth_lang = st.session_state.lang_selector
 
 auth_status, user_email = get_status()
 
@@ -714,13 +682,12 @@ def load_logo(file_path):
     return None
 
 # ─── LOGIN / REGISTER SCREENS ─────────────────────────────────────────────────
-if auth_status != "paid" and not st.session_state.recovery_mode and not st.session_state.get('show_email_confirmed'):
-    at_temp = auth_texts.get(st.session_state.auth_lang, auth_texts["English"])
+if auth_status != "paid":
     st.selectbox(
-        at_temp.get("lang_select_label", "🌐 Select Language"),
+        "🌐 Select Language / Dil Seçin",
         list(auth_texts.keys()),
         index=list(auth_texts.keys()).index(st.session_state.auth_lang) if st.session_state.auth_lang in auth_texts else 0,
-        key="lang_selector", on_change=update_lang_global, args=("lang_selector",)
+        key="lang_selector", on_change=update_lang
     )
     at = auth_texts.get(st.session_state.auth_lang, auth_texts["English"])
 
@@ -816,15 +783,14 @@ with st.sidebar:
         st.markdown("<div style='text-align:center;padding:0.8rem 0 0.5rem;'><span style='font-size:1.8rem;font-weight:800;color:#0f172a;'>SarSa</span><span style='font-size:1.8rem;font-weight:800;background:linear-gradient(135deg,#3b82f6,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;'> AI</span></div>", unsafe_allow_html=True)
 
     st.divider()
-    
-    at_side = auth_texts.get(st.session_state.auth_lang, auth_texts["English"])
+
     current_ui_lang = st.selectbox(
-        at_side.get("lang_select_label", "🌐 Interface Language"),
+        f"🌐 {ui_languages.get(st.session_state.auth_lang, ui_languages['English']).get('interface_lang','Interface Language')}",
         list(ui_languages.keys()),
-        index=list(ui_languages.keys()).index(st.session_state.auth_lang) if st.session_state.auth_lang in ui_languages else 0,
-        key="ui_lang_sidebar", on_change=update_lang_global, args=("ui_lang_sidebar",)
+        index=list(ui_languages.keys()).index(st.session_state.auth_lang) if st.session_state.auth_lang in ui_languages else 0
     )
-    t = ui_languages[st.session_state.auth_lang]
+    t = ui_languages[current_ui_lang]
+    st.session_state.auth_lang = current_ui_lang
 
     with st.expander(f"⚙️ {t['acc_settings']}"):
         st.write(st.session_state.user_email)
@@ -879,7 +845,6 @@ with st.sidebar:
         st.session_state.user_email    = None
         st.session_state.access_token  = None
         st.session_state.refresh_token = None
-        st.query_params.clear()
         st.rerun()
 
     st.markdown("---")
@@ -937,6 +902,7 @@ if uploaded_files:
             with st.spinner(t.get('loading','Crafting your premium marketing ecosystem...')):
                 st.success("Talebiniz AI'a iletildi! Seçtiğiniz alanlar için içerikler hazırlanıyor.")
             
+            # Form verilerini Gemini için derliyoruz
             prompt_context = f"""
             Target Language: {st.session_state.target_lang_input}
             Property Type: {st.session_state.prop_type}
@@ -967,6 +933,7 @@ if uploaded_files:
                         Make it engaging and strictly tailored to the requested marketing strategy and target audience.
                         """
                         try:
+                            # Gemini'ye fotoğrafları ve promptu gönder
                             response = model.generate_content([specific_prompt] + images_for_ai)
                             generated_text = response.text
                             st.markdown(generated_text)
