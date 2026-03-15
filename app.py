@@ -719,7 +719,7 @@ def load_logo(file_path):
     return None
 
 # ─── LOGIN / REGISTER SCREENS ─────────────────────────────────────────────────
-if auth_status != "paid":
+if auth_status != "paid" and not st.session_state.recovery_mode and not st.session_state.get('show_email_confirmed'):
     at_temp = auth_texts.get(st.session_state.auth_lang, auth_texts["English"])
     st.selectbox(
         at_temp.get("lang_select_label", "🌐 Select Language"),
