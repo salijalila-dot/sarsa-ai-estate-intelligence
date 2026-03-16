@@ -459,9 +459,12 @@ if auth_status != "paid":
                     else:
                         try:
                             supabase.auth.reset_password_for_email(
-                                email_reset,
-                                {"redirect_to": "https://sarsa-ai-estateintelligence.streamlit.app/?action=reset_pw"}
-                            )
+    email_reset,
+    {
+        "redirect_to": "https://sarsa-ai-estateintelligence.streamlit.app/",
+        "flow_type": "implicit" # BU SATIR KRİTİK: Her tarayıcıda çalışmasını sağlar
+    }
+)
                             st.success(f"✅ {at['reset_success']}")
                         except Exception as e:
                             st.error(f"Error: {e}")
