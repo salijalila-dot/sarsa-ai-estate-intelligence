@@ -432,10 +432,14 @@ if auth_status != "paid":
             if st.form_submit_button(at["btn_reg"]):
                 try:
                     supabase.auth.sign_up({
-                        "email": email_reg,
-                        "password": pw_reg,
-                        "options": {"email_redirect_to": "https://sarsa-ai-estateintelligence.streamlit.app/?action=signup_confirm"}
-                    })
+    "email": email_reg,
+    "password": pw_reg,
+    "options": {
+        "email_redirect_to": "https://sarsa-ai-estateintelligence.streamlit.app/",
+        "flow_type": "implicit" # Her cihazda onaylanabilmesi için
+    }
+})
+
                     st.success(f"✅ {at['success_reg']}")
                 except Exception as ex:
                     error_msg = str(ex)
