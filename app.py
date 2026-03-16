@@ -71,6 +71,9 @@ query_params = st.query_params
 action = query_params.get("action")
 code = query_params.get("code")
 
+# Oturumun başarıyla kurulup kurulmadığını takip etmek için bir bayrak ekliyoruz
+session_established = False
+
 # 1) PKCE Flow & Code Exchange (Şifre sıfırlama ve Doğrulama için)
 if code:
     try:
@@ -79,8 +82,11 @@ if code:
             st.session_state.access_token = res.session.access_token
             st.session_state.refresh_token = res.session.refresh_token
             supabase.auth.set_session(res.session.access_token, res.session.refresh_token)
+            session_established = True
     except Exception as e:
-        st.error(f"Authentication link is invalid or expired. Please request a new one.")
+        # HATA DURUMUNDA BURADA DURDURUYORUZ (st.stop)
+        st.error("⚠️ Güvenlik İhlali: Şifre sıfırlama linki geçersiz veya farklı bir tarayıcıda açıldı! Lütfen e-postanızdaki linki kopyalayıp işlemi başlattığınız tarayıcıya yapıştırın.")
+        st.stop() 
 
 # 2) Implicit Flow (Yedek)
 if "access_token" in query_params:
@@ -91,6 +97,7 @@ if "access_token" in query_params:
         st.session_state.refresh_token = _rt
         try:
             supabase.auth.set_session(_at, _rt)
+            session_established = True
         except Exception:
             pass
 
@@ -102,57 +109,16 @@ if action == "signup_confirm" or query_params.get("type") == "signup":
     st.rerun()
 
 elif action == "reset_pw" or query_params.get("type") == "recovery":
-    st.session_state.recovery_mode = True
-    st.session_state.is_logged_in = False
-    st.query_params.clear()
-    st.rerun()
+    # SADECE SESSION VARSA FORMA YÖNLENDİR!
+    if session_established or st.session_state.get("access_token"):
+        st.session_state.recovery_mode = True
+        st.session_state.is_logged_in = False
+        st.query_params.clear()
+        st.rerun()
+    else:
+        st.error("Güvenlik nedeniyle oturum başlatılamadı. Linki aynı cihaz ve tarayıcıda açtığınızdan emin olun.")
+        st.stop()
 
-elif action == "confirm_delete":
-    token = query_params.get("token", "")
-    try:
-        result = supabase.table("pending_deletions").select("*").eq("confirm_token", token).execute()
-        if result.data:
-            record     = result.data[0]
-            expires_at = datetime.fromisoformat(record.get("expires_at","").replace("Z","+00:00"))
-            if datetime.now(timezone.utc) < expires_at:
-                try:
-                    svc = create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_SERVICE_KEY"])
-                    svc.auth.admin.delete_user(record["user_id"])
-                except Exception:
-                    pass 
-                supabase.table("pending_deletions").delete().eq("confirm_token", token).execute()
-                for _k in ["is_logged_in","user_email","access_token","refresh_token"]:
-                    st.session_state[_k] = None if _k != "is_logged_in" else False
-                st.query_params.clear()
-                st.markdown("""
-                <div style='text-align:center;padding:5rem 2rem;'>
-                  <div style='font-size:5rem;margin-bottom:1rem;'>👋</div>
-                  <h1 style='color:#0f172a;font-weight:800;'>Account Deleted</h1>
-                  <p style='color:#475569;font-size:1.15rem;margin-top:1rem;line-height:1.7;'>
-                    Your SarSa AI account has been <strong>permanently deleted</strong>.<br>
-                    All your data has been removed from our systems.
-                  </p>
-                  <p style='color:#94a3b8;margin-top:2rem;font-size:0.95rem;'>You have been logged out.</p>
-                </div>""", unsafe_allow_html=True)
-                st.stop()
-            else:
-                st.error("This confirmation link has expired (24h limit). Please request a new deletion from Account Settings.")
-        else:
-            st.error("Invalid or already used link.")
-    except Exception as e:
-        st.error(f"Error during account deletion: {e}")
-    st.stop()
-
-elif action == "cancel_delete":
-    token = query_params.get("token", "")
-    try:
-        supabase.table("pending_deletions").delete().eq("cancel_token", token).execute()
-    except Exception:
-        pass
-    st.query_params.clear()
-    st.success("Account deletion cancelled. Your account is completely safe!")
-    import time; time.sleep(2)
-    st.rerun()
 
 # ─── EMAIL HELPER — Delete Confirmation ───────────────────────────────────────
 def send_delete_confirmation_email(to_email: str, confirm_token: str, cancel_token: str):
